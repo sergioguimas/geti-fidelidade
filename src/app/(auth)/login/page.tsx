@@ -21,11 +21,9 @@ export default function LoginPage() {
 
     // SIMULAÇÃO DE API (DELAY DE 1s)
     setTimeout(() => {
-      // Lógica Hardcoded para o protótipo
       if (email === "admin@geti.com") {
         router.push("/admin/dashboard")
       } else {
-        // Qualquer outro email ou "cliente@geti.com" vai para a área do cliente
         router.push("/cliente")
       }
       setLoading(false)

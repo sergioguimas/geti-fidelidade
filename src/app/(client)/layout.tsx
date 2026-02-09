@@ -2,7 +2,8 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { Home, History, User, Store } from "lucide-react"
+import { Home, History, User, Store, LogOut } from "lucide-react"
+import { Button } from "@/components/ui/button"
 
 export default function ClientLayout({
   children,
@@ -32,6 +33,11 @@ export default function ClientLayout({
           <Link href="/cliente/perfil" className={isActive("/cliente/perfil") ? "text-primary" : "text-muted-foreground hover:text-foreground"}>
             Perfil
           </Link>
+          <Button className="gap-2" asChild>
+            <Link href="/login">
+              <LogOut className="h-4 w-4" />
+            </Link>
+          </Button>
         </nav>
       </header>
 

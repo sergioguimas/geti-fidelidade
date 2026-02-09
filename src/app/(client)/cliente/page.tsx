@@ -4,7 +4,7 @@ import { useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Progress } from "@/components/ui/progress" // Se der erro, remova ou instale: npx shadcn-ui@latest add progress
-import { QrCode, Gift, ChevronRight, Star } from "lucide-react"
+import { QrCode, Gift, ChevronRight, Star, Link, LogOut } from "lucide-react"
 import {
   Drawer,
   DrawerClose,

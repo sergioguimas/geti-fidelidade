@@ -24,11 +24,11 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#ffffff", // Cor da barra de status no Android
+  themeColor: "#ffffff",
   width: "device-width",
   initialScale: 1,
   maximumScale: 1,
-  userScalable: false, // Impede zoom tipo pinça (sensação de app nativo)
+  userScalable: false,
 };
 
 export default function RootLayout({

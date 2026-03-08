@@ -1,0 +1,262 @@
+export type UUID = string;
+export type CompraStatus = "pendente" | "aprovada" | "recusada" | "cancelada";
+export type OrigemCompra = "cliente" | "lojista";
+
+export type ClienteListItem = {
+  id: UUID;
+  lojista_id: UUID;
+  nome: string;
+  telefone: string | null;
+  email: string | null;
+  cpf: string | null;
+  ativo: boolean;
+  created_at: string;
+  updated_at: string;
+  fidelidade?: {
+    streak_atual: number;
+    saldo_disponivel: number;
+    saldo_pendente: number;
+    saldo_negativo: number;
+    ultima_compra_valida_em: string | null;
+  } | null;
+};
+
+export type ClienteCreateInput = {
+  lojistaId: UUID;
+  nome: string;
+  telefone?: string;
+  email?: string;
+  cpf?: string;
+};
+
+export type ClienteOption = {
+  id: UUID;
+  nome: string;
+};
+
+export type CompraListItem = {
+  id: UUID;
+  lojista_id: UUID;
+  cliente_id: UUID;
+  valor_total: number;
+  origem: OrigemCompra;
+  status: CompraStatus;
+  data_compra: string;
+  created_at: string;
+  cliente?: {
+    id: UUID;
+    nome: string;
+  } | null;
+  lote?: {
+    id: UUID;
+    pontos_gerados: number;
+    pontos_disponiveis: number;
+    pontos_pendentes: number;
+    status: "pendente" | "disponivel" | "cancelado" | "expirado";
+  } | null;
+};
+
+export type CompraCreateInput = {
+  lojistaId: UUID;
+  clienteId: UUID;
+  valorTotal: number;
+  dataCompra: string;
+  origem?: OrigemCompra;
+  status?: CompraStatus;
+};
+
+export type PremioListItem = {
+  id: UUID;
+  lojista_id: UUID;
+  nome: string;
+  descricao: string | null;
+  pontos_necessarios: number;
+  nivel_minimo_id: UUID | null;
+  ativo: boolean;
+  created_at: string;
+  nivel_minimo?: {
+    id: UUID;
+    nome: string;
+    ordem: number;
+  } | null;
+};
+
+export type PremioCreateInput = {
+  lojistaId: UUID;
+  nome: string;
+  descricao?: string;
+  pontosNecessarios: number;
+  nivelMinimoId?: UUID | null;
+  ativo?: boolean;
+};
+
+export type NivelOption = {
+  id: UUID;
+  nome: string;
+  ordem: number;
+};
+
+export type ResgateStatus = "pendente" | "aprovado" | "recusado" | "cancelado";
+
+export type ResgateListItem = {
+  id: UUID;
+  cliente_id: UUID;
+  lojista_id: UUID;
+  premio_id: UUID;
+  pontos_solicitados: number;
+  status: ResgateStatus;
+  solicitado_em: string;
+  decidido_em: string | null;
+  cliente?: {
+    id: UUID;
+    nome: string;
+  } | null;
+  premio?: {
+    id: UUID;
+    nome: string;
+  } | null;
+};
+
+export type ResgateActionInput = {
+  resgateId: UUID;
+  status: Extract<ResgateStatus, "aprovado" | "recusado">;
+};
+
+export type ClienteUpdateInput = {
+  id: UUID;
+  nome: string;
+  telefone?: string;
+  email?: string;
+  cpf?: string;
+  ativo?: boolean;
+};
+
+export type CompraUpdateInput = {
+  id: UUID;
+  clienteId: UUID;
+  valorTotal: number;
+  dataCompra: string;
+  status: CompraStatus;
+};
+
+export type PremioUpdateInput = {
+  id: UUID;
+  nome: string;
+  descricao?: string;
+  pontosNecessarios: number;
+  nivelMinimoId?: UUID | null;
+  ativo?: boolean;
+};
+
+export type DashboardRange = "7d" | "30d" | "90d";
+
+export type DashboardSummary = {
+  clientes_total: number;
+  clientes_ativos_programa: number;
+  compras_periodo: number;
+  vendas_periodo: number;
+  ticket_medio: number;
+  pontos_disponiveis: number;
+  resgates_pendentes: number;
+  premios_ativos: number;
+  taxa_recorrencia: number;
+};
+
+export type DashboardTopCliente = {
+  cliente_id: string;
+  nome: string;
+  total_gasto: number;
+  compras: number;
+};
+
+export type DashboardNivelDistribuicao = {
+  nivel: string;
+  quantidade: number;
+};
+
+export type DashboardSolicitacao = {
+  id: string;
+  tipo: "resgate";
+  cliente_nome: string;
+  titulo: string;
+  status: string;
+  data: string;
+};
+
+export type DashboardData = {
+  summary: DashboardSummary;
+  trends: DashboardTrends;
+  top_clientes: DashboardTopCliente[];
+  niveis: DashboardNivelDistribuicao[];
+  solicitacoes: DashboardSolicitacao[];
+};
+
+export type DashboardTrendItem = {
+  current: number;
+  previous: number;
+  change_percent: number | null;
+  direction: "up" | "down" | "neutral";
+};
+
+export type DashboardTrends = {
+  clientes: DashboardTrendItem;
+  vendas: DashboardTrendItem;
+  pontos: DashboardTrendItem;
+  resgates: DashboardTrendItem;
+};
+
+export type ProgramaFidelidadeConfig = {
+  id: UUID;
+  lojista_id: UUID;
+  nome: string;
+  dias_para_perder_streak: number;
+  dias_expiracao_pontos: number;
+  ativo: boolean;
+  created_at?: string;
+  updated_at?: string;
+};
+
+export type ProgramaNivelConfig = {
+  id: UUID;
+  programa_id: UUID;
+  nome: string;
+  streak_min: number;
+  streak_max: number | null;
+  percentual_conversao: number;
+  teto_pontos_compra: number;
+  ordem: number;
+  created_at?: string;
+};
+
+export type ConfiguracoesData = {
+  programa: ProgramaFidelidadeConfig | null;
+  niveis: ProgramaNivelConfig[];
+};
+
+export type UpdateProgramaInput = {
+  id: UUID;
+  nome: string;
+  dias_para_perder_streak: number;
+  dias_expiracao_pontos: number;
+  ativo: boolean;
+};
+
+export type CreateNivelInput = {
+  programaId: UUID;
+  nome: string;
+  streakMin: number;
+  streakMax: number | null;
+  percentualConversao: number;
+  tetoPontosCompra: number;
+  ordem: number;
+};
+
+export type UpdateNivelInput = {
+  id: UUID;
+  nome: string;
+  streakMin: number;
+  streakMax: number | null;
+  percentualConversao: number;
+  tetoPontosCompra: number;
+  ordem: number;
+};

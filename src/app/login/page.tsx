@@ -119,22 +119,22 @@ export default function LoginPage() {
 
     if (activeTab === "merchant") {
       return {
-        title: "Login do lojista",
+        title: "Portal do Lojista",
         description:
-          "Entre com sua conta para acessar o painel e gerenciar sua operação.",
-        rightTitle: "Um acesso elegante para uma operação profissional.",
+          "Gerencie suas campanhas, acompanhe resultados e fortaleça o laço com seus clientes.",
+        rightTitle: "Transforme pontos em fidelidade real.",
         rightDescription:
-          "Fluxo moderno, contraste forte e foco total na experiência de autenticação do lojista.",
+          "Uma plataforma completa para analisar o comportamento dos seus clientes e impulsionar suas vendas de forma inteligente.",
       };
     }
 
     return {
-      title: "Login do cliente",
+      title: "Área do Cliente",
       description:
-        "Acesse sua área utilizando CNPJ e senha com um fluxo simples e direto.",
-      rightTitle: "Acesso rápido para o cliente final.",
+        "Acesse sua conta para conferir seus pontos e resgatar recompensas exclusivas.",
+      rightTitle: "Seus benefícios em um só lugar.",
       rightDescription:
-        "Uma interface pensada para facilitar a autenticação e manter a experiência clara em qualquer dispositivo.",
+        "Acompanhe seu saldo em tempo real e descubra como aproveitar as vantagens que preparamos para você.",
     };
   }, [activeTab, viewMode]);
 

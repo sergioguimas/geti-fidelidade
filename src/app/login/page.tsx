@@ -16,6 +16,13 @@ import { formatCnpj } from "@/lib/formatters/cnpj";
 type AuthTab = "merchant" | "customer";
 type ViewMode = "login" | "recover" | "terms";
 
+type ClienteLoginRow = {
+  id: string;
+  email: string | null;
+  auth_user_id: string | null;
+  pode_fazer_login: boolean;
+};
+
 export default function LoginPage() {
   const router = useRouter();
 
@@ -58,20 +65,24 @@ export default function LoginPage() {
     setLoading(true);
     setError("");
 
-    const { error } = await supabase.auth.signInWithPassword({
-      email: merchantEmail,
-      password: merchantPassword,
-    });
+    try {
+      const { error } = await supabase.auth.signInWithPassword({
+        email: merchantEmail,
+        password: merchantPassword,
+      });
 
-    if (error) {
-      setError(error.message);
-      setLoading(false);
-      return;
-    }
+      if (error) {
+        setError("Email ou senha inválidos.");
+        return;
+      }
 
-    setTimeout(() => {
       router.push("/lojista");
-    }, 700);
+      router.refresh();
+    } catch {
+      setError("Não foi possível entrar agora.");
+    } finally {
+      setLoading(false);
+    }
   }
 
   async function handleCustomerLogin(e: React.FormEvent<HTMLFormElement>) {
@@ -80,18 +91,72 @@ export default function LoginPage() {
     setLoading(true);
     setError("");
 
-    const normalizedCnpj = customerCnpj.replace(/\D/g, "");
+    try {
+      const normalizedCnpj = customerCnpj.replace(/\D/g, "");
 
-    if (normalizedCnpj.length !== 14) {
-      setError("Informe um CNPJ válido.");
-      setLoading(false);
-      return;
-    }
+      if (normalizedCnpj.length !== 14) {
+        setError("Informe um CNPJ válido.");
+        return;
+      }
 
-    setTimeout(() => {
-      setLoading(false);
+      const { data: cliente, error: clienteError } = await supabase
+        .from("clientes")
+        .select("id, email, auth_user_id, pode_fazer_login")
+        .eq("cpf", normalizedCnpj)
+        .single<ClienteLoginRow>();
+
+      if (clienteError || !cliente) {
+        setError("Cliente não encontrado.");
+        return;
+      }
+
+      if (!cliente.pode_fazer_login) {
+        setError("O acesso deste cliente ainda não foi liberado.");
+        return;
+      }
+
+      if (!cliente.email) {
+        setError("Cliente sem email vinculado para autenticação.");
+        return;
+      }
+
+      const { data: authData, error: signInError } =
+        await supabase.auth.signInWithPassword({
+          email: cliente.email,
+          password: customerPassword,
+        });
+
+      if (signInError) {
+        setError("CNPJ ou senha inválidos.");
+        return;
+      }
+
+      const authUserId = authData.user?.id;
+
+      if (!authUserId) {
+        await supabase.auth.signOut();
+        setError("Não foi possível validar a sessão do cliente.");
+        return;
+      }
+
+      if (cliente.auth_user_id && cliente.auth_user_id !== authUserId) {
+        await supabase.auth.signOut();
+        setError("O usuário autenticado não corresponde ao cliente informado.");
+        return;
+      }
+
+      await supabase
+        .from("clientes")
+        .update({ ultimo_login_em: new Date().toISOString() })
+        .eq("id", cliente.id);
+
       router.push("/cliente");
-    }, 700);
+      router.refresh();
+    } catch {
+      setError("Não foi possível entrar agora.");
+    } finally {
+      setLoading(false);
+    }
   }
 
   const titles = useMemo(() => {
@@ -153,10 +218,15 @@ export default function LoginPage() {
     >
       <div className="relative min-h-[460px]">
         <div
-          className={viewMode === "login" ? "relative" : "pointer-events-none absolute inset-0"}
+          className={
+            viewMode === "login"
+              ? "relative"
+              : "pointer-events-none absolute inset-0"
+          }
           style={{
             opacity: viewMode === "login" ? 1 : 0,
-            transform: viewMode === "login" ? "translateY(0px)" : "translateY(12px)",
+            transform:
+              viewMode === "login" ? "translateY(0px)" : "translateY(12px)",
             transition: "opacity 300ms ease, transform 300ms ease",
           }}
         >
@@ -263,10 +333,15 @@ export default function LoginPage() {
         </div>
 
         <div
-          className={viewMode === "recover" ? "relative" : "pointer-events-none absolute inset-0"}
+          className={
+            viewMode === "recover"
+              ? "relative"
+              : "pointer-events-none absolute inset-0"
+          }
           style={{
             opacity: viewMode === "recover" ? 1 : 0,
-            transform: viewMode === "recover" ? "translateY(0px)" : "translateY(12px)",
+            transform:
+              viewMode === "recover" ? "translateY(0px)" : "translateY(12px)",
             transition: "opacity 300ms ease, transform 300ms ease",
           }}
         >
@@ -277,10 +352,15 @@ export default function LoginPage() {
         </div>
 
         <div
-          className={viewMode === "terms" ? "relative" : "pointer-events-none absolute inset-0"}
+          className={
+            viewMode === "terms"
+              ? "relative"
+              : "pointer-events-none absolute inset-0"
+          }
           style={{
             opacity: viewMode === "terms" ? 1 : 0,
-            transform: viewMode === "terms" ? "translateY(0px)" : "translateY(12px)",
+            transform:
+              viewMode === "terms" ? "translateY(0px)" : "translateY(12px)",
             transition: "opacity 300ms ease, transform 300ms ease",
           }}
         >

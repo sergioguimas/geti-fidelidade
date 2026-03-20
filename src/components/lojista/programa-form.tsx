@@ -2,6 +2,7 @@
 
 import { FormEvent, useEffect, useState } from "react";
 import type { ProgramaFidelidadeConfig } from "@/lib/types";
+import { authFetch } from "@/lib/api";
 
 type ProgramaFormProps = {
   initialData: ProgramaFidelidadeConfig | null;
@@ -43,7 +44,7 @@ export function ProgramaForm({ initialData, onSaved }: ProgramaFormProps) {
     setError(null);
 
     try {
-      const response = await fetch("/api/lojista/configuracoes", {
+      const response = await authFetch("/api/lojista/configuracoes", {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",

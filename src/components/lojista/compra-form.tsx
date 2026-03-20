@@ -2,6 +2,7 @@
 
 import { FormEvent, useEffect, useState } from "react";
 import type { ClienteOption } from "@/lib/types";
+import { authFetch } from "@/lib/api";
 
 type CompraFormInitialData = {
   id: string;
@@ -72,7 +73,7 @@ export function CompraForm({
         throw new Error("Informe a data da compra.");
       }
 
-      const response = await fetch("/api/lojista/compras", {
+      const response = await authFetch("/api/lojista/compras", {
         method: isEditing ? "PATCH" : "POST",
         headers: {
           "Content-Type": "application/json",

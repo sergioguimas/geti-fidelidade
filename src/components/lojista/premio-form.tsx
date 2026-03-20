@@ -2,6 +2,7 @@
 
 import { FormEvent, useEffect, useState } from "react";
 import type { NivelOption } from "@/lib/types";
+import { authFetch } from "@/lib/api";
 
 type PremioFormInitialData = {
   id: string;
@@ -65,7 +66,7 @@ export function PremioForm({
         throw new Error("Informe uma pontuação válida.");
       }
 
-      const response = await fetch("/api/lojista/premios", {
+      const response = await authFetch("/api/lojista/premios", {
         method: isEditing ? "PATCH" : "POST",
         headers: {
           "Content-Type": "application/json",

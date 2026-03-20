@@ -5,6 +5,7 @@ import type { ResgateListItem } from "@/lib/types";
 import { TableCard } from "@/components/ui/table-card";
 import { TableEmptyState } from "@/components/ui/table-empty-state";
 import { StatusBadge } from "@/components/ui/status-badge";
+import { authFetch } from "@/lib/api";
 
 type ResgatesTableProps = {
   resgates: ResgateListItem[];
@@ -57,7 +58,7 @@ export function ResgatesTable({
     setError(null);
 
     try {
-      const response = await fetch("/api/lojista/resgates", {
+      const response = await authFetch("/api/lojista/resgates", {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",

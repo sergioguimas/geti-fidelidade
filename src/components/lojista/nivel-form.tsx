@@ -2,6 +2,7 @@
 
 import { FormEvent, useEffect, useState } from "react";
 import type { ProgramaNivelConfig } from "@/lib/types";
+import { authFetch } from "@/lib/api";
 
 type NivelFormProps = {
   programaId: string;
@@ -62,7 +63,7 @@ export function NivelForm({
         ordem: Number(ordem),
       };
 
-      const response = await fetch("/api/lojista/configuracoes", {
+      const response = await authFetch("/api/lojista/configuracoes", {
         method: isEditing ? "PATCH" : "POST",
         headers: {
           "Content-Type": "application/json",

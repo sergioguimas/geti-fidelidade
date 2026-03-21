@@ -1,34 +1,39 @@
 "use client";
 
 import { FormEvent, useEffect, useState } from "react";
-import type { ClienteOption } from "@/lib/types";
+import type { ClienteOption, ProdutoOption } from "@/lib/types";
 import { authFetch } from "@/lib/api";
 
-type CompraFormInitialData = {
+export type CompraFormInitialData = {
   id: string;
   clienteId: string;
-  valorTotal: number;
+  produtoId?: string;
+  quantidade?: number;
+  valorUnitario?: number;
   dataCompra: string;
-  status: "pendente" | "aprovada" | "recusada" | "cancelada";
 } | null;
 
+
+
 type CompraFormProps = {
-  lojistaId: string;
   clientes: ClienteOption[];
+  produtos: ProdutoOption[];
   initialData?: CompraFormInitialData;
   onCreated: () => void | Promise<void>;
   onCancel?: () => void;
 };
 
 export function CompraForm({
-  lojistaId,
   clientes,
+  produtos,
   initialData = null,
   onCreated,
   onCancel,
 }: CompraFormProps) {
   const [clienteId, setClienteId] = useState("");
-  const [valorTotal, setValorTotal] = useState("");
+  const [produtoId, setProdutoId] = useState("");
+  const [quantidade, setQuantidade] = useState("1");
+  const [valorUnitario, setValorUnitario] = useState("");
   const [dataCompra, setDataCompra] = useState("");
   const [status, setStatus] = useState<
     "pendente" | "aprovada" | "recusada" | "cancelada"
@@ -41,15 +46,20 @@ export function CompraForm({
 
   useEffect(() => {
     setClienteId(initialData?.clienteId ?? "");
-    setValorTotal(
-      initialData?.valorTotal != null ? String(initialData.valorTotal) : ""
+    setProdutoId(initialData?.produtoId ?? "");
+    setQuantidade(
+      initialData?.quantidade != null ? String(initialData.quantidade) : "1"
+    );
+    setValorUnitario(
+      initialData?.valorUnitario != null
+        ? String(initialData.valorUnitario)
+        : ""
     );
     setDataCompra(
       initialData?.dataCompra
         ? initialData.dataCompra.slice(0, 10)
         : new Date().toISOString().slice(0, 10)
     );
-    setStatus(initialData?.status ?? "aprovada");
   }, [initialData]);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -59,43 +69,63 @@ export function CompraForm({
     setError(null);
 
     try {
-      const valor = Number(valorTotal);
+      const quantidadeNumber = Number(quantidade);
+      const valorUnitarioNumber = Number(valorUnitario);
 
       if (!clienteId) {
         throw new Error("Selecione um cliente.");
       }
 
-      if (!valor || Number.isNaN(valor) || valor <= 0) {
-        throw new Error("Informe um valor válido para a compra.");
+      if (!produtoId) {
+        throw new Error("Selecione um produto.");
+      }
+
+      if (!quantidadeNumber || Number.isNaN(quantidadeNumber) || quantidadeNumber <= 0) {
+        throw new Error("Informe uma quantidade válida.");
+      }
+
+      if (
+        !valorUnitarioNumber ||
+        Number.isNaN(valorUnitarioNumber) ||
+        valorUnitarioNumber <= 0
+      ) {
+        throw new Error("Informe um valor unitário válido.");
       }
 
       if (!dataCompra) {
         throw new Error("Informe a data da compra.");
       }
 
+      const payload = isEditing
+        ? {
+            id: initialData?.id,
+            clienteId,
+            dataCompra,
+            origem: "manual",
+            itens: [
+              {
+                produtoId,
+                quantidade: quantidadeNumber,
+                valorUnitario: valorUnitarioNumber,
+              },
+            ],
+          }
+        : {
+            clienteId,
+            dataCompra,
+            origem: "manual",
+            itens: [
+              {
+                produtoId,
+                quantidade: quantidadeNumber,
+                valorUnitario: valorUnitarioNumber,
+              },
+            ],
+          };
+
       const response = await authFetch("/api/lojista/compras", {
         method: isEditing ? "PATCH" : "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(
-          isEditing
-            ? {
-                id: initialData?.id,
-                clienteId,
-                valorTotal: valor,
-                dataCompra,
-                status,
-              }
-            : {
-                lojistaId,
-                clienteId,
-                valorTotal: valor,
-                dataCompra,
-                status: "aprovada",
-                origem: "lojista",
-              }
-        ),
+        body: JSON.stringify(payload),
       });
 
       const text = await response.text();
@@ -118,8 +148,10 @@ export function CompraForm({
       }
 
       setClienteId("");
-      setValorTotal("");
-      setDataCompra("");
+      setProdutoId("");
+      setQuantidade("1");
+      setValorUnitario("");
+      setDataCompra(new Date().toISOString().slice(0, 10));
       setStatus("aprovada");
 
       await onCreated();
@@ -130,7 +162,7 @@ export function CompraForm({
     }
   }
 
-  return (
+   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       <div className="grid gap-4 md:grid-cols-2">
         <div className="md:col-span-2">
@@ -145,7 +177,6 @@ export function CompraForm({
             required
           >
             <option value="">Selecione um cliente</option>
-
             {clientes.map((cliente) => (
               <option key={cliente.id} value={cliente.id}>
                 {cliente.nome}
@@ -154,24 +185,60 @@ export function CompraForm({
           </select>
         </div>
 
+        <div className="md:col-span-2">
+          <label className="mb-1.5 block text-sm font-medium text-zinc-800">
+            Produto
+          </label>
+
+          <select
+            value={produtoId}
+            onChange={(e) => setProdutoId(e.target.value)}
+            className="w-full rounded-xl border border-zinc-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-zinc-400"
+            required
+          >
+            <option value="">Selecione um produto</option>
+            {produtos.map((produto) => (
+              <option key={produto.id} value={produto.id}>
+                {produto.descricao}
+              </option>
+            ))}
+          </select>
+        </div>
+
         <div>
           <label className="mb-1.5 block text-sm font-medium text-zinc-800">
-            Valor da compra
+            Quantidade
+          </label>
+
+          <input
+            type="number"
+            min="1"
+            step="1"
+            value={quantidade}
+            onChange={(e) => setQuantidade(e.target.value)}
+            className="w-full rounded-xl border border-zinc-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-zinc-400"
+            required
+          />
+        </div>
+
+        <div>
+          <label className="mb-1.5 block text-sm font-medium text-zinc-800">
+            Valor unitário
           </label>
 
           <input
             type="number"
             step="0.01"
             min="0.01"
-            value={valorTotal}
-            onChange={(e) => setValorTotal(e.target.value)}
+            value={valorUnitario}
+            onChange={(e) => setValorUnitario(e.target.value)}
             placeholder="100.00"
             className="w-full rounded-xl border border-zinc-200 bg-white px-3 py-2.5 text-sm outline-none placeholder:text-zinc-400 focus:border-zinc-400"
             required
           />
         </div>
 
-        <div>
+        <div className="md:col-span-2">
           <label className="mb-1.5 block text-sm font-medium text-zinc-800">
             Data da compra
           </label>
@@ -184,33 +251,6 @@ export function CompraForm({
             required
           />
         </div>
-
-        {isEditing ? (
-          <div className="md:col-span-2">
-            <label className="mb-1.5 block text-sm font-medium text-zinc-800">
-              Status
-            </label>
-
-            <select
-              value={status}
-              onChange={(e) =>
-                setStatus(
-                  e.target.value as
-                    | "pendente"
-                    | "aprovada"
-                    | "recusada"
-                    | "cancelada"
-                )
-              }
-              className="w-full rounded-xl border border-zinc-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-zinc-400"
-            >
-              <option value="pendente">Pendente</option>
-              <option value="aprovada">Aprovada</option>
-              <option value="recusada">Recusada</option>
-              <option value="cancelada">Cancelada</option>
-            </select>
-          </div>
-        ) : null}
       </div>
 
       {error ? (

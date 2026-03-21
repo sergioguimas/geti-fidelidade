@@ -7,7 +7,7 @@ type ClienteFormInitialData = {
   nome: string;
   telefone: string;
   email: string;
-  cpf: string;
+  cnpj: string;
   ativo?: boolean;
 } | null;
 
@@ -27,7 +27,7 @@ export function ClienteForm({
   const [nome, setNome] = useState("");
   const [telefone, setTelefone] = useState("");
   const [email, setEmail] = useState("");
-  const [cpf, setCpf] = useState("");
+  const [cnpj, setCnpj] = useState("");
   const [ativo, setAtivo] = useState(true);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -38,7 +38,7 @@ export function ClienteForm({
     setNome(initialData?.nome ?? "");
     setTelefone(initialData?.telefone ?? "");
     setEmail(initialData?.email ?? "");
-    setCpf(initialData?.cpf ?? "");
+    setCnpj(initialData?.cnpj ?? "");
     setAtivo(initialData?.ativo ?? true);
   }, [initialData]);
 
@@ -63,7 +63,7 @@ export function ClienteForm({
                 nome,
                 telefone,
                 email,
-                cpf,
+                cnpj,
                 ativo,
               }
             : {
@@ -71,7 +71,7 @@ export function ClienteForm({
                 nome,
                 telefone,
                 email,
-                cpf,
+                cnpj,
               }
         ),
       });
@@ -97,7 +97,7 @@ export function ClienteForm({
       setNome("");
       setTelefone("");
       setEmail("");
-      setCpf("");
+      setCnpj("");
       setAtivo(true);
 
       await onCreated();
@@ -138,12 +138,12 @@ export function ClienteForm({
 
         <div>
           <label className="mb-1.5 block text-sm font-medium text-zinc-800">
-            CPF
+            CNPJ
           </label>
           <input
-            value={cpf}
-            onChange={(e) => setCpf(e.target.value)}
-            placeholder="000.000.000-00"
+            value={cnpj}
+            onChange={(e) => setCnpj(e.target.value)}
+            placeholder="00.000.000/0000-00"
             className="w-full rounded-xl border border-zinc-200 bg-white px-3 py-2.5 text-sm outline-none placeholder:text-zinc-400 focus:border-zinc-400"
           />
         </div>

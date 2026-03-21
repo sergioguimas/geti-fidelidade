@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { requireLojistaContext } from "@/lib/auth/server-context";
 import {
   createNivel,
   deleteNivel,
@@ -9,17 +10,10 @@ import {
 
 export async function GET(request: NextRequest) {
   try {
-    const { searchParams } = new URL(request.url);
-    const lojistaId = searchParams.get("lojistaId");
+    const { supabase, lojistaId } = await requireLojistaContext(request);
 
-    if (!lojistaId) {
-      return NextResponse.json(
-        { error: "lojistaId é obrigatório." },
-        { status: 400 }
-      );
-    }
+    const data = await getConfiguracoes(supabase, lojistaId);
 
-    const data = await getConfiguracoes(lojistaId);
     return NextResponse.json({ data });
   } catch (error) {
     return NextResponse.json(
@@ -36,15 +30,16 @@ export async function GET(request: NextRequest) {
 
 export async function PATCH(request: NextRequest) {
   try {
+    const { supabase, lojistaId } = await requireLojistaContext(request);
     const body = await request.json();
 
     if (body.type === "programa") {
-      const data = await updatePrograma(body.payload);
+      const data = await updatePrograma(supabase, lojistaId, body.payload);
       return NextResponse.json({ data });
     }
 
     if (body.type === "nivel") {
-      const data = await updateNivel(body.payload);
+      const data = await updateNivel(supabase, lojistaId, body.payload);
       return NextResponse.json({ data });
     }
 
@@ -67,6 +62,7 @@ export async function PATCH(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
+    const { supabase, lojistaId } = await requireLojistaContext(request);
     const body = await request.json();
 
     if (body.type !== "nivel") {
@@ -76,7 +72,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const data = await createNivel(body.payload);
+    const data = await createNivel(supabase, lojistaId, body.payload);
     return NextResponse.json({ data }, { status: 201 });
   } catch (error) {
     return NextResponse.json(
@@ -94,6 +90,7 @@ export async function POST(request: NextRequest) {
 export async function DELETE(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
+    const { supabase, lojistaId } = await requireLojistaContext(request);
     const id = searchParams.get("id");
 
     if (!id) {
@@ -103,7 +100,7 @@ export async function DELETE(request: NextRequest) {
       );
     }
 
-    const data = await deleteNivel(id);
+    const data = await deleteNivel(supabase, lojistaId, id);
     return NextResponse.json({ data });
   } catch (error) {
     return NextResponse.json(

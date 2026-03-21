@@ -14,7 +14,7 @@ export async function listClientes(lojistaId: string, busca?: string) {
       nome,
       telefone,
       email,
-      cpf,
+      cnpj,
       ativo,
       created_at,
       updated_at,
@@ -43,7 +43,7 @@ export async function listClientes(lojistaId: string, busca?: string) {
     nome: item.nome,
     telefone: item.telefone,
     email: item.email,
-    cpf: item.cpf,
+    cnpj: item.cnpj,
     ativo: item.ativo,
     created_at: item.created_at,
     updated_at: item.updated_at,
@@ -61,7 +61,7 @@ export async function createCliente(input: ClienteCreateInput) {
       nome: input.nome.trim(),
       telefone: input.telefone?.trim() || null,
       email: input.email?.trim() || null,
-      cpf: input.cpf?.trim() || null,
+      cnpj: input.cnpj?.trim() || null,
       ativo: true,
     })
     .select()
@@ -78,7 +78,7 @@ export async function updateCliente(input: ClienteUpdateInput) {
       nome: input.nome.trim(),
       telefone: input.telefone?.trim() || null,
       email: input.email?.trim() || null,
-      cpf: input.cpf?.trim() || null,
+      cnpj: input.cnpj?.trim() || null,
       ativo: input.ativo ?? true,
     })
     .eq("id", input.id)

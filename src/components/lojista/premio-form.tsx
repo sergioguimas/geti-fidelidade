@@ -14,7 +14,6 @@ type PremioFormInitialData = {
 } | null;
 
 type PremioFormProps = {
-  lojistaId: string;
   niveis: NivelOption[];
   initialData?: PremioFormInitialData;
   onCreated: () => void | Promise<void>;
@@ -22,7 +21,6 @@ type PremioFormProps = {
 };
 
 export function PremioForm({
-  lojistaId,
   niveis,
   initialData = null,
   onCreated,
@@ -82,7 +80,6 @@ export function PremioForm({
                 ativo,
               }
             : {
-                lojistaId,
                 nome,
                 descricao,
                 pontosNecessarios: pontos,

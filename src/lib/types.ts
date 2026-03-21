@@ -8,7 +8,7 @@ export type ClienteListItem = {
   nome: string;
   telefone: string | null;
   email: string | null;
-  cpf: string | null;
+  cnpj: string | null;
   ativo: boolean;
   created_at: string;
   updated_at: string;
@@ -26,7 +26,7 @@ export type ClienteCreateInput = {
   nome: string;
   telefone?: string;
   email?: string;
-  cpf?: string;
+  cnpj?: string;
 };
 
 export type ClienteOption = {
@@ -34,26 +34,38 @@ export type ClienteOption = {
   nome: string;
 };
 
+export type CompraItemListItem = {
+  id: string;
+  produto_id: string;
+  descricao_produto: string;
+  quantidade: number;
+  valor_unitario: number;
+  subtotal: number;
+  percentual_aplicado: number;
+  pontos_gerados: number;
+};
+
 export type CompraListItem = {
-  id: UUID;
-  lojista_id: UUID;
-  cliente_id: UUID;
-  valor_total: number;
-  origem: OrigemCompra;
-  status: CompraStatus;
+  id: string;
+  lojista_id: string;
+  cliente_id: string;
+  pontos_total: number;
+  origem: string | null;
   data_compra: string;
   created_at: string;
-  cliente?: {
-    id: UUID;
+  updated_at: string | null;
+  clientes: {
+    id: string;
     nome: string;
+    email: string | null;
+    telefone: string | null;
   } | null;
-  lote?: {
-    id: UUID;
-    pontos_gerados: number;
-    pontos_disponiveis: number;
-    pontos_pendentes: number;
-    status: "pendente" | "disponivel" | "cancelado" | "expirado";
-  } | null;
+  compra_itens: CompraItemListItem[];
+};
+
+export type ProdutoOption = {
+  id: string;
+  descricao: string;
 };
 
 export type CompraCreateInput = {
@@ -82,7 +94,6 @@ export type PremioListItem = {
 };
 
 export type PremioCreateInput = {
-  lojistaId: UUID;
   nome: string;
   descricao?: string;
   pontosNecessarios: number;
@@ -127,7 +138,7 @@ export type ClienteUpdateInput = {
   nome: string;
   telefone?: string;
   email?: string;
-  cpf?: string;
+  cnpj?: string;
   ativo?: boolean;
 };
 

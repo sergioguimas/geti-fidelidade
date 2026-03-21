@@ -4,40 +4,41 @@ import { useEffect, useMemo, useState } from "react";
 import { Receipt, Search } from "lucide-react";
 import { CompraForm } from "@/components/lojista/compra-form";
 import { ComprasTable } from "@/components/lojista/compras-table";
-import type { ClienteOption, CompraListItem } from "@/lib/types";
-
-const LOJISTA_ID = "9f2a1cb4-f2cc-41be-b4ae-3af0d61863c2";
+import type { ClienteOption, CompraListItem, ProdutoOption } from "@/lib/types";
+import { authFetch } from "@/lib/api";
 
 export default function ComprasPage() {
   const [compras, setCompras] = useState<CompraListItem[]>([]);
   const [clientes, setClientes] = useState<ClienteOption[]>([]);
+  const [produtos, setProdutos] = useState<ProdutoOption[]>([]);
   const [busca, setBusca] = useState("");
   const [loading, setLoading] = useState(true);
   const [loadingClientes, setLoadingClientes] = useState(true);
+  const [loadingProdutos, setLoadingProdutos] = useState(true);
   const [openForm, setOpenForm] = useState(false);
-  const [editingCompra, setEditingCompra] = useState<CompraListItem | null>(
-    null
-  );
+  const [editingCompra, setEditingCompra] = useState<CompraListItem | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const queryString = useMemo(() => {
-    const params = new URLSearchParams({
-      lojistaId: LOJISTA_ID,
-    });
+  const params = new URLSearchParams();
 
-    if (busca.trim()) {
-      params.set("busca", busca.trim());
-    }
+  if (busca.trim()) {
+    params.set("busca", busca.trim());
+  }
 
-    return params.toString();
-  }, [busca]);
+  return params.toString();
+}, [busca]);
 
   async function loadCompras() {
     setLoading(true);
     setError(null);
 
     try {
-      const response = await fetch(`/api/lojista/compras?${queryString}`, {
+      const url = queryString
+        ? `/api/lojista/compras?${queryString}`
+        : `/api/lojista/compras`;
+
+      const response = await authFetch(url, {
         cache: "no-store",
       });
 
@@ -67,11 +68,10 @@ export default function ComprasPage() {
 
     try {
       const params = new URLSearchParams({
-        lojistaId: LOJISTA_ID,
         mode: "clientes",
       });
 
-      const response = await fetch(`/api/lojista/compras?${params.toString()}`, {
+      const response = await authFetch(`/api/lojista/compras?${params.toString()}`, {
         cache: "no-store",
       });
 
@@ -96,12 +96,45 @@ export default function ComprasPage() {
     }
   }
 
+  async function loadProdutos() {
+    setLoadingProdutos(true);
+
+    try {
+      const response = await authFetch("/api/lojista/produtos", {
+        cache: "no-store",
+      });
+
+      const text = await response.text();
+
+      let result: any;
+      try {
+        result = JSON.parse(text);
+      } catch {
+        throw new Error("A API de produtos não retornou JSON válido.");
+      }
+
+      if (!response.ok) {
+        throw new Error(result.error || "Erro ao carregar produtos.");
+      }
+
+      setProdutos(result.data ?? []);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Erro inesperado.");
+    } finally {
+      setLoadingProdutos(false);
+    }
+  }
+
   useEffect(() => {
     loadCompras();
   }, [queryString]);
 
   useEffect(() => {
     loadClientes();
+  }, []);
+
+  useEffect(() => {
+    loadProdutos();
   }, []);
 
   function handleNewCompra() {
@@ -134,7 +167,7 @@ export default function ComprasPage() {
     setError(null);
 
     try {
-      const response = await fetch(`/api/lojista/compras?id=${id}`, {
+      const response = await authFetch(`/api/lojista/compras?id=${id}`, {
         method: "DELETE",
       });
 
@@ -195,20 +228,24 @@ export default function ComprasPage() {
             </p>
           </div>
 
-          {loadingClientes ? (
-            <div className="text-sm text-zinc-500">Carregando clientes...</div>
+          {loadingClientes || loadingProdutos ? (
+            <div className="text-sm text-zinc-500">
+              Carregando clientes e produtos...
+            </div>
           ) : (
             <CompraForm
-              lojistaId={LOJISTA_ID}
               clientes={clientes}
+              produtos={produtos}
               initialData={
                 editingCompra
                   ? {
                       id: editingCompra.id,
                       clienteId: editingCompra.cliente_id,
-                      valorTotal: editingCompra.valor_total,
+                      produtoId: editingCompra.compra_itens?.[0]?.produto_id ?? "",
+                      quantidade: editingCompra.compra_itens?.[0]?.quantidade ?? 1,
+                      valorUnitario:
+                        editingCompra.compra_itens?.[0]?.valor_unitario ?? 0,
                       dataCompra: editingCompra.data_compra,
-                      status: editingCompra.status,
                     }
                   : null
               }

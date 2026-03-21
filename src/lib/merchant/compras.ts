@@ -7,7 +7,6 @@ export type CompraItemInput = {
 };
 
 export type CompraCreateInput = {
-  lojistaId: string;
   clienteId: string;
   dataCompra: string;
   origem?: string;
@@ -154,6 +153,7 @@ export async function listCompras(
 
 export async function createCompra(
   supabase: SupabaseClient,
+  lojistaId: string,
   input: CompraCreateInput
 ) {
   if (!input.itens?.length) {
@@ -162,7 +162,7 @@ export async function createCompra(
 
   const produtosMap = await loadProdutos(
     supabase,
-    input.lojistaId,
+    lojistaId,
     input.itens.map((item) => item.produtoId)
   );
 
@@ -174,7 +174,7 @@ export async function createCompra(
   const { data: compra, error: compraError } = await supabase
     .from("compras")
     .insert({
-      lojista_id: input.lojistaId,
+      lojista_id: lojistaId,
       cliente_id: input.clienteId,
       pontos_total: pontosTotal,
       origem: input.origem ?? "manual",
@@ -206,6 +206,7 @@ export async function createCompra(
 
 export async function updateCompra(
   supabase: SupabaseClient,
+  lojistaId: string,
   input: CompraUpdateInput
 ) {
   if (!input.itens?.length) {
@@ -214,7 +215,7 @@ export async function updateCompra(
 
   const produtosMap = await loadProdutos(
     supabase,
-    input.lojistaId,
+    lojistaId,
     input.itens.map((item) => item.produtoId)
   );
 

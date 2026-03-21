@@ -42,8 +42,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const compra = await createCompra(supabase, {
-      lojistaId,
+    const compra = await createCompra(supabase, lojistaId, {
       clienteId: body.clienteId,
       dataCompra: body.dataCompra,
       origem: body.origem ?? "manual",
@@ -71,7 +70,7 @@ export async function PATCH(request: NextRequest) {
       );
     }
 
-    const compra = await updateCompra(supabase, {
+    const compra = await updateCompra(supabase, lojistaId, {
       id: body.id,
       lojistaId,
       clienteId: body.clienteId,

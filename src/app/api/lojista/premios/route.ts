@@ -1,29 +1,26 @@
 import { NextRequest, NextResponse } from "next/server";
+import { requireLojistaContext } from "@/lib/auth/server-context";
 import {
   createPremio,
   deactivatePremio,
   listNivelOptions,
-  listPremios,
+  listPremios, 
   updatePremio,
 } from "@/lib/merchant/premios";
 
 export async function GET(request: NextRequest) {
   try {
+    const { supabase, lojistaId } = await requireLojistaContext(request);
     const { searchParams } = new URL(request.url);
-    const lojistaId = searchParams.get("lojistaId");
     const busca = searchParams.get("busca") ?? undefined;
     const mode = searchParams.get("mode");
 
-    if (!lojistaId) {
-      return NextResponse.json({ error: "lojistaId é obrigatório." }, { status: 400 });
-    }
-
     if (mode === "niveis") {
-      const niveis = await listNivelOptions(lojistaId);
+      const niveis = await listNivelOptions(supabase, lojistaId);
       return NextResponse.json({ data: niveis });
     }
 
-    const premios = await listPremios(lojistaId, busca);
+    const premios = await listPremios(supabase, lojistaId, busca);
     return NextResponse.json({ data: premios });
   } catch (error) {
     return NextResponse.json(
@@ -35,16 +32,23 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
+    const { supabase, lojistaId } = await requireLojistaContext(request);
     const body = await request.json();
 
-    if (!body.lojistaId || !body.nome?.trim() || !body.pontosNecessarios) {
+    if (!body.nome?.trim() || body.pontosNecessarios == null) {
       return NextResponse.json(
         { error: "lojistaId, nome e pontosNecessarios são obrigatórios." },
         { status: 400 }
       );
     }
 
-    const premio = await createPremio(body);
+    const premio = await createPremio(supabase, lojistaId, {
+      nome: body.nome,
+      descricao: body.descricao ?? null,
+      pontosNecessarios: Number(body.pontosNecessarios),
+      nivelMinimoId: body.nivelMinimoId ?? null,
+      ativo: body.ativo ?? true,
+    });
     return NextResponse.json({ data: premio }, { status: 201 });
   } catch (error) {
     return NextResponse.json(
@@ -56,6 +60,7 @@ export async function POST(request: NextRequest) {
 
 export async function PATCH(request: NextRequest) {
   try {
+    const { supabase } = await requireLojistaContext(request);
     const body = await request.json();
 
     if (!body.id || !body.nome?.trim() || !body.pontosNecessarios) {
@@ -65,7 +70,14 @@ export async function PATCH(request: NextRequest) {
       );
     }
 
-    const premio = await updatePremio(body);
+    const premio = await updatePremio(supabase, {
+      id: body.id,
+      nome: body.nome,
+      descricao: body.descricao ?? null,
+      pontosNecessarios: Number(body.pontosNecessarios),
+      nivelMinimoId: body.nivelMinimoId ?? null,
+      ativo: body.ativo ?? true,
+    });
     return NextResponse.json({ data: premio });
   } catch (error) {
     return NextResponse.json(
@@ -77,6 +89,7 @@ export async function PATCH(request: NextRequest) {
 
 export async function DELETE(request: NextRequest) {
   try {
+    const { supabase } = await requireLojistaContext(request);
     const { searchParams } = new URL(request.url);
     const id = searchParams.get("id");
 
@@ -84,7 +97,7 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: "id é obrigatório." }, { status: 400 });
     }
 
-    const premio = await deactivatePremio(id);
+    const premio = await deactivatePremio(supabase, id);
     return NextResponse.json({ data: premio });
   } catch (error) {
     return NextResponse.json(

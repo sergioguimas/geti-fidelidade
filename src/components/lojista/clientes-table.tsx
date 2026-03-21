@@ -81,7 +81,7 @@ export function ClientesTable({ clientes, onEdit, onDelete }: ClientesTableProps
                     <div>
                       <p className="font-medium text-zinc-900">{cliente.nome}</p>
                       <p className="mt-1 text-sm text-zinc-500">
-                        {cliente.cpf || "CPF não informado"}
+                        {cliente.cnpj || "cnpj não informado"}
                       </p>
                     </div>
                   </td>

@@ -5,12 +5,11 @@ import { Settings, Plus } from "lucide-react";
 import { ProgramaForm } from "@/components/lojista/programa-form";
 import { NivelForm } from "@/components/lojista/nivel-form";
 import { NiveisTable } from "@/components/lojista/niveis-table";
+import { authFetch } from "@/lib/api";
 import type {
   ConfiguracoesData,
   ProgramaNivelConfig,
 } from "@/lib/types";
-
-const LOJISTA_ID = "9f2a1cb4-f2cc-41be-b4ae-3af0d61863c2";
 
 export default function ConfiguracoesPage() {
   const [data, setData] = useState<ConfiguracoesData | null>(null);
@@ -24,12 +23,9 @@ export default function ConfiguracoesPage() {
     setError(null);
 
     try {
-      const response = await fetch(
-        `/api/lojista/configuracoes?lojistaId=${LOJISTA_ID}`,
-        {
-          cache: "no-store",
-        }
-      );
+      const response = await authFetch(`/api/lojista/configuracoes`, {
+        cache: "no-store",
+      });
 
       const result = await response.json();
 
@@ -37,6 +33,7 @@ export default function ConfiguracoesPage() {
         throw new Error(result.error || "Erro ao carregar configurações.");
       }
 
+      console.log("configuracoes result", result);
       setData(result.data ?? null);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erro inesperado.");
@@ -74,7 +71,7 @@ export default function ConfiguracoesPage() {
     if (!confirmed) return;
 
     try {
-      const response = await fetch(`/api/lojista/configuracoes?id=${id}`, {
+      const response = await authFetch(`/api/lojista/configuracoes?id=${id}`, {
         method: "DELETE",
       });
 

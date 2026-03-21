@@ -102,7 +102,7 @@ export default function LoginPage() {
       const { data: cliente, error: clienteError } = await supabase
         .from("clientes")
         .select("id, email, auth_user_id, pode_fazer_login")
-        .eq("cpf", normalizedCnpj)
+        .eq("cnpj", normalizedCnpj)
         .single<ClienteLoginRow>();
 
       if (clienteError || !cliente) {

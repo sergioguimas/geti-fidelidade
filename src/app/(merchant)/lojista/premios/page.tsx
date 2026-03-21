@@ -9,8 +9,7 @@ import { PageToolbar } from "@/components/crud/page-toolbar";
 import { PageSearch } from "@/components/crud/page-search";
 import { PageFeedback } from "@/components/crud/page-feedback";
 import type { NivelOption, PremioListItem } from "@/lib/types";
-
-const LOJISTA_ID = "9f2a1cb4-f2cc-41be-b4ae-3af0d61863c2";
+import { authFetch } from "@/lib/api";
 
 export default function PremiosPage() {
   const [niveis, setNiveis] = useState<NivelOption[]>([]);
@@ -32,17 +31,26 @@ export default function PremiosPage() {
     loadItems,
     deleteItem,
   } = useCrudListPage<PremioListItem>({
-    baseUrl: `/api/lojista/premios?lojistaId=${LOJISTA_ID}`,
+    baseUrl: `/api/lojista/premios`,
   });
+
+  const queryString = useMemo(() => {
+    const params = new URLSearchParams();
+
+    if (busca.trim()) {
+      params.set("busca", busca.trim());
+    }
+
+    return params.toString();
+  }, [busca]);
 
   async function loadNiveis() {
     setLoadingNiveis(true);
 
     try {
-      const response = await fetch(
-        `/api/lojista/premios?lojistaId=${LOJISTA_ID}&mode=niveis`,
-        { cache: "no-store" }
-      );
+      const response = await authFetch("/api/lojista/configuracoes", {
+        cache: "no-store",
+      });
 
       const result = await response.json();
 
@@ -50,14 +58,20 @@ export default function PremiosPage() {
         throw new Error(result.error || "Erro ao carregar níveis.");
       }
 
-      setNiveis(result.data ?? []);
+      const niveisData = result.data?.niveis ?? [];
+
+      setNiveis(
+        niveisData.map((nivel: any) => ({
+          id: nivel.id,
+          nome: nivel.nome ?? `Nível ${nivel.ordem}`,
+        }))
+      );
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erro inesperado.");
     } finally {
       setLoadingNiveis(false);
     }
   }
-
   useEffect(() => {
     loadNiveis();
   }, []);
@@ -96,7 +110,6 @@ export default function PremiosPage() {
             <div className="text-sm text-zinc-500">Carregando níveis...</div>
           ) : (
             <PremioForm
-              lojistaId={LOJISTA_ID}
               niveis={niveis}
               initialData={
                 editingItem

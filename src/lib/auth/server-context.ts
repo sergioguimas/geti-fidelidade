@@ -18,6 +18,7 @@ export async function requireLojistaContext(
   } = await supabase.auth.getUser();
 
   if (userError || !user) {
+    console.log(userError)
     throw new Error("Usuário não autenticado.");
   }
 

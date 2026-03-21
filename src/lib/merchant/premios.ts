@@ -1,4 +1,4 @@
-import { supabase } from "@/lib/supabase";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import type {
   NivelOption,
   PremioCreateInput,
@@ -6,7 +6,10 @@ import type {
   PremioUpdateInput,
 } from "@/lib/types";
 
-export async function listPremios(lojistaId: string, busca?: string) {
+export async function listPremios(
+  supabase: SupabaseClient,
+  lojistaId: string, 
+  busca?: string) {
   let query = supabase
     .from("premios")
     .select(`
@@ -49,11 +52,14 @@ export async function listPremios(lojistaId: string, busca?: string) {
   })) as PremioListItem[];
 }
 
-export async function createPremio(input: PremioCreateInput) {
+export async function createPremio(
+  supabase: SupabaseClient,
+  lojistaId: string,
+  input: PremioCreateInput) {
   const { data, error } = await supabase
     .from("premios")
     .insert({
-      lojista_id: input.lojistaId,
+      lojista_id: lojistaId,
       nome: input.nome.trim(),
       descricao: input.descricao?.trim() || null,
       pontos_necessarios: input.pontosNecessarios,
@@ -67,7 +73,9 @@ export async function createPremio(input: PremioCreateInput) {
   return data;
 }
 
-export async function updatePremio(input: PremioUpdateInput) {
+export async function updatePremio(
+  supabase: SupabaseClient,
+  input: PremioUpdateInput) {
   const { data, error } = await supabase
     .from("premios")
     .update({
@@ -83,9 +91,11 @@ export async function updatePremio(input: PremioUpdateInput) {
 
   if (error) throw new Error(error.message);
   return data;
-}
+} 
 
-export async function deactivatePremio(id: string) {
+export async function deactivatePremio(
+  supabase: SupabaseClient,
+  id: string) {
   const { data, error } = await supabase
     .from("premios")
     .update({ ativo: false })
@@ -97,7 +107,9 @@ export async function deactivatePremio(id: string) {
   return data;
 }
 
-export async function listNivelOptions(lojistaId: string) {
+export async function listNivelOptions(
+  supabase: SupabaseClient,
+  lojistaId: string) {
   const { data: programa, error: programaError } = await supabase
     .from("programas_fidelidade")
     .select("id")

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { authFetch } from "@/lib/api";
 
 type UseCrudListPageParams<TItem> = {
   baseUrl: string;
@@ -35,7 +36,7 @@ export function useCrudListPage<TItem>({
     setError(null);
 
     try {
-      const response = await fetch(queryString, {
+      const response = await authFetch(queryString, {
         cache: "no-store",
       });
 
@@ -95,7 +96,7 @@ export function useCrudListPage<TItem>({
     setError(null);
 
     try {
-      const response = await fetch(deleteUrl, {
+      const response = await authFetch(deleteUrl, {
         method: "DELETE",
       });
 

@@ -1,4 +1,4 @@
-import { supabase } from "@/lib/supabase";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import type {
   ConfiguracoesData,
   CreateNivelInput,
@@ -6,7 +6,10 @@ import type {
   UpdateProgramaInput,
 } from "@/lib/types";
 
-export async function getConfiguracoes(lojistaId: string): Promise<ConfiguracoesData> {
+export async function getConfiguracoes(
+  supabase: SupabaseClient,
+  lojistaId: string
+): Promise<ConfiguracoesData> {
   const { data: programa, error: programaError } = await supabase
     .from("programas_fidelidade")
     .select("*")
@@ -43,7 +46,11 @@ export async function getConfiguracoes(lojistaId: string): Promise<Configuracoes
   };
 }
 
-export async function updatePrograma(input: UpdateProgramaInput) {
+export async function updatePrograma(
+  supabase: SupabaseClient,
+  lojistaId: string,
+  input: UpdateProgramaInput
+) {
   const { data, error } = await supabase
     .from("programas_fidelidade")
     .update({
@@ -53,6 +60,7 @@ export async function updatePrograma(input: UpdateProgramaInput) {
       ativo: input.ativo,
     })
     .eq("id", input.id)
+    .eq("lojista_id", lojistaId) // 🔐 importante
     .select()
     .single();
 
@@ -63,7 +71,11 @@ export async function updatePrograma(input: UpdateProgramaInput) {
   return data;
 }
 
-export async function createNivel(input: CreateNivelInput) {
+export async function createNivel(
+  supabase: SupabaseClient,
+  lojistaId: string,
+  input: CreateNivelInput
+) {
   const { data, error } = await supabase
     .from("programa_niveis")
     .insert({
@@ -85,7 +97,11 @@ export async function createNivel(input: CreateNivelInput) {
   return data;
 }
 
-export async function updateNivel(input: UpdateNivelInput) {
+export async function updateNivel(
+  supabase: SupabaseClient,
+  lojistaId: string,
+  input: UpdateNivelInput
+) {
   const { data, error } = await supabase
     .from("programa_niveis")
     .update({
@@ -107,8 +123,15 @@ export async function updateNivel(input: UpdateNivelInput) {
   return data;
 }
 
-export async function deleteNivel(id: string) {
-  const { error } = await supabase.from("programa_niveis").delete().eq("id", id);
+export async function deleteNivel(
+  supabase: SupabaseClient,
+  lojistaId: string,
+  id: string
+) {
+  const { error } = await supabase
+    .from("programa_niveis")
+    .delete()
+    .eq("id", id);
 
   if (error) {
     throw new Error(error.message);

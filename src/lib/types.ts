@@ -51,6 +51,26 @@ export type ClienteOption = {
   nome: string;
 };
 
+export type LotePontosListItem = {
+  id: string;
+  compra_id: string;
+  cliente_id: string;
+  lojista_id: string;
+  nivel_id: string | null;
+  percentual_aplicado: number;
+  teto_aplicado: number;
+  pontos_gerados: number;
+  pontos_disponiveis: number;
+  pontos_pendentes: number;
+  pontos_gastos: number;
+  pontos_expirados: number;
+  pontos_cancelados: number;
+  status: string | null;
+  gerado_em: string | null;
+  expira_em: string | null;
+  created_at: string;
+};
+
 export type CompraItemListItem = {
   id: string;
   produto_id: string;
@@ -66,18 +86,22 @@ export type CompraListItem = {
   id: string;
   lojista_id: string;
   cliente_id: string;
+  valor_total: number;
   pontos_total: number;
+  status: string | null;
   origem: string | null;
   data_compra: string;
   created_at: string;
   updated_at: string | null;
-  clientes: {
+  cliente: {
     id: string;
     nome: string;
     email: string | null;
     telefone: string | null;
   } | null;
   compra_itens: CompraItemListItem[];
+  lotes_pontos: LotePontosListItem[];
+  lote: LotePontosListItem | null;
 };
 
 export type ProdutoListItem = {
@@ -102,13 +126,28 @@ export type ProdutoOption = {
   descricao: string;
 };
 
+export type CompraItemInput = {
+  produtoId: string;
+  quantidade: number;
+  valorUnitario: number;
+};
+
 export type CompraCreateInput = {
-  lojistaId: UUID;
-  clienteId: UUID;
-  valorTotal: number;
+  clienteId: string;
   dataCompra: string;
-  origem?: OrigemCompra;
-  status?: CompraStatus;
+  origem?: string;
+  status?: "pendente" | "aprovada" | "recusada" | "cancelada";
+  itens: CompraItemInput[];
+};
+
+export type CompraUpdateInput = {
+  id: string;
+  lojistaId: string;
+  clienteId: string;
+  dataCompra: string;
+  origem?: string;
+  status?: "pendente" | "aprovada" | "recusada" | "cancelada";
+  itens: CompraItemInput[];
 };
 
 export type PremioListItem = {
@@ -175,14 +214,6 @@ export type ClienteUpdateInput = {
   cnpj?: string | null;
   ativo?: boolean;
   podeFazerLogin?: boolean;
-};
-
-export type CompraUpdateInput = {
-  id: UUID;
-  clienteId: UUID;
-  valorTotal: number;
-  dataCompra: string;
-  status: CompraStatus;
 };
 
 export type PremioUpdateInput = {

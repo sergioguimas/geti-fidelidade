@@ -1,26 +1,9 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-
-export type CompraItemInput = {
-  produtoId: string;
-  quantidade: number;
-  valorUnitario: number;
-};
-
-export type CompraCreateInput = {
-  clienteId: string;
-  dataCompra: string;
-  origem?: string;
-  itens: CompraItemInput[];
-};
-
-export type CompraUpdateInput = {
-  id: string;
-  lojistaId: string;
-  clienteId: string;
-  dataCompra: string;
-  origem?: string;
-  itens: CompraItemInput[];
-};
+import type {
+  CompraCreateInput,
+  CompraUpdateInput,
+  CompraItemInput,
+} from "../types";
 
 function round2(value: number) {
   return Math.round(value * 100) / 100;
@@ -64,8 +47,6 @@ function buildCompraItens(
 
     const subtotal = round2(item.quantidade * item.valorUnitario);
 
-    // provisório: enquanto a regra de nível não for religada,
-    // usamos o teto do produto também como teto do nível
     const tetoPercentualProduto = Number(produto.teto_percentual);
     const tetoPercentualNivel = Number(produto.teto_percentual);
     const percentualAplicado = Math.min(
@@ -95,42 +76,89 @@ export async function listCompras(
   busca?: string
 ) {
   let query = supabase
-    .from("compras")
-    .select(`
+  .from("compras")
+  .select(`
+    id,
+    lojista_id,
+    cliente_id,
+    valor_total,
+    pontos_total,
+    status,
+    origem,
+    data_compra,
+    created_at,
+    updated_at,
+    clientes (
       id,
-      lojista_id,
+      nome,
+      email,
+      telefone
+    ),
+    compra_itens (
+      id,
+      produto_id,
+      descricao_produto,
+      quantidade,
+      valor_unitario,
+      subtotal,
+      percentual_aplicado,
+      pontos_gerados
+    ),
+    lotes_pontos (
+      id,
+      compra_id,
       cliente_id,
-      pontos_total,
-      origem,
-      data_compra,
-      created_at,
-      updated_at,
-      clientes (
-        id,
-        nome,
-        email,
-        telefone
-      ),
-      compra_itens (
-        id,
-        produto_id,
-        descricao_produto,
-        quantidade,
-        valor_unitario,
-        subtotal,
-        percentual_aplicado,
-        pontos_gerados
-      )
-    `)
-    .eq("lojista_id", lojistaId)
-    .order("data_compra", { ascending: false });
+      lojista_id,
+      nivel_id,
+      percentual_aplicado,
+      teto_aplicado,
+      pontos_gerados,
+      pontos_disponiveis,
+      pontos_pendentes,
+      pontos_gastos,
+      pontos_expirados,
+      pontos_cancelados,
+      status,
+      gerado_em,
+      expira_em,
+      created_at
+    )
+  `)
+  .eq("lojista_id", lojistaId)
+  .order("data_compra", { ascending: false });
 
   const { data, error } = await query;
   if (error) throw new Error(error.message);
 
-  let rows = (data ?? []).map((item: any) => ({
-    ...item,
+  let rows = (data ?? []).map((item: any) => {
+  const lotes = (item.lotes_pontos ?? []).map((lp: any) => ({
+    ...lp,
+    percentual_aplicado: Number(lp.percentual_aplicado ?? 0),
+    teto_aplicado: Number(lp.teto_aplicado ?? 0),
+    pontos_gerados: Number(lp.pontos_gerados ?? 0),
+    pontos_disponiveis: Number(lp.pontos_disponiveis ?? 0),
+    pontos_pendentes: Number(lp.pontos_pendentes ?? 0),
+    pontos_gastos: Number(lp.pontos_gastos ?? 0),
+    pontos_expirados: Number(lp.pontos_expirados ?? 0),
+    pontos_cancelados: Number(lp.pontos_cancelados ?? 0),
+  }));
+
+  const cliente = Array.isArray(item.clientes)
+    ? item.clientes[0] ?? null
+    : item.clientes ?? null;
+
+  return {
+    id: item.id,
+    lojista_id: item.lojista_id,
+    cliente_id: item.cliente_id,
+    valor_total: Number(item.valor_total ?? 0),
     pontos_total: Number(item.pontos_total ?? 0),
+    status: item.status ?? null,
+    origem: item.origem ?? null,
+    data_compra: item.data_compra,
+    created_at: item.created_at,
+    updated_at: item.updated_at ?? null,
+    cliente,
     compra_itens: (item.compra_itens ?? []).map((ci: any) => ({
       ...ci,
       quantidade: Number(ci.quantidade),
@@ -139,12 +167,15 @@ export async function listCompras(
       percentual_aplicado: Number(ci.percentual_aplicado),
       pontos_gerados: Number(ci.pontos_gerados),
     })),
-  }));
+    lotes_pontos: lotes,
+    lote: lotes[0] ?? null,
+  };
+});
 
   if (busca?.trim()) {
     const term = busca.trim().toLowerCase();
     rows = rows.filter((item: any) =>
-      item.clientes?.nome?.toLowerCase().includes(term)
+      item.cliente?.nome?.toLowerCase().includes(term)
     );
   }
 
@@ -167,9 +198,15 @@ export async function createCompra(
   );
 
   const compraItens = buildCompraItens(produtosMap, input.itens);
+
+  const valorTotal = round2(
+    compraItens.reduce((sum, item) => sum + item.subtotal, 0)
+  );
+
   const pontosTotal = round2(
     compraItens.reduce((sum, item) => sum + item.pontos_gerados, 0)
   );
+  
 
   const { data: compra, error: compraError } = await supabase
     .from("compras")
@@ -177,10 +214,12 @@ export async function createCompra(
       lojista_id: lojistaId,
       cliente_id: input.clienteId,
       pontos_total: pontosTotal,
-      origem: input.origem ?? "manual",
+      valor_total: valorTotal,
+      origem: input.origem ?? "lojista",
+      status: input.status ?? "aprovada",
       data_compra: input.dataCompra,
     })
-    .select("id, lojista_id, cliente_id, pontos_total, origem, data_compra")
+    .select("id, lojista_id, cliente_id, valor_total, pontos_total, status, origem, data_compra, created_at, updated_at")
     .single();
 
   if (compraError || !compra) {
@@ -220,6 +259,11 @@ export async function updateCompra(
   );
 
   const compraItens = buildCompraItens(produtosMap, input.itens);
+
+  const valorTotal = round2(
+    compraItens.reduce((sum, item) => sum + item.subtotal, 0)
+  );
+
   const pontosTotal = round2(
     compraItens.reduce((sum, item) => sum + item.pontos_gerados, 0)
   );
@@ -229,12 +273,14 @@ export async function updateCompra(
     .update({
       cliente_id: input.clienteId,
       pontos_total: pontosTotal,
-      origem: input.origem ?? "manual",
+      valor_total: valorTotal,
+      origem: input.origem ?? "lojista",
+      status: input.status ?? "aprovada",
       data_compra: input.dataCompra,
     })
     .eq("id", input.id)
     .eq("lojista_id", input.lojistaId)
-    .select("id, lojista_id, cliente_id, pontos_total, origem, data_compra")
+    .select("id, lojista_id, cliente_id, valor_total, pontos_total, status, origem, data_compra, created_at, updated_at")
     .single();
 
   if (compraError || !compra) {
@@ -281,16 +327,18 @@ export async function listClienteOptions(
   lojistaId: string
 ) {
   const { data, error } = await supabase
-    .from("compras")
+    .from("clientes_fidelidade")
     .select(`
       cliente_id,
+      ativo,
       clientes (
         id,
         nome
       )
     `)
     .eq("lojista_id", lojistaId)
-    .order("created_at", { ascending: false });
+    .eq("ativo", true)
+    .order("updated_at", { ascending: false });
 
   if (error) throw new Error(error.message);
 
@@ -298,8 +346,12 @@ export async function listClienteOptions(
 
   for (const row of data ?? []) {
     const cliente = Array.isArray(row.clientes) ? row.clientes[0] : row.clientes;
+
     if (cliente?.id && !map.has(cliente.id)) {
-      map.set(cliente.id, { id: cliente.id, nome: cliente.nome });
+      map.set(cliente.id, {
+        id: cliente.id,
+        nome: cliente.nome,
+      });
     }
   }
 

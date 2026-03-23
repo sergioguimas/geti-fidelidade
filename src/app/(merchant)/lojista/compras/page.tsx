@@ -104,20 +104,13 @@ export default function ComprasPage() {
         cache: "no-store",
       });
 
-      const text = await response.text();
-
-      let result: any;
-      try {
-        result = JSON.parse(text);
-      } catch {
-        throw new Error("A API de produtos não retornou JSON válido.");
-      }
+      const result = await response.json();
 
       if (!response.ok) {
         throw new Error(result.error || "Erro ao carregar produtos.");
       }
 
-      setProdutos(result.data ?? []);
+      setProdutos((result.data ?? []).filter((produto: any) => produto.ativo));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erro inesperado.");
     } finally {

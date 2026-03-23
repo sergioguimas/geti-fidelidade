@@ -465,7 +465,7 @@ export async function updateCliente(
     `)
     .single();
 
-  if (error || !data) {
+  if (error || !data) { 
     throw new Error(error?.message ?? "Erro ao atualizar cliente.");
   }
 

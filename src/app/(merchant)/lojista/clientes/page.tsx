@@ -159,7 +159,7 @@ export default function ClientesPage() {
 
           <ClienteForm
             initialData={
-              editingCliente
+              editingCliente 
                 ? {
                     id: editingCliente.id,
                     nome: editingCliente.nome,

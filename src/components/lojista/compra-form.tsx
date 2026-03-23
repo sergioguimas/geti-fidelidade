@@ -1,6 +1,7 @@
 "use client";
 
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
+import { Plus, Search, Trash2, X } from "lucide-react";
 import type { ClienteOption, ProdutoOption } from "@/lib/types";
 import { authFetch } from "@/lib/api";
 
@@ -13,8 +14,6 @@ export type CompraFormInitialData = {
   dataCompra: string;
 } | null;
 
-
-
 type CompraFormProps = {
   clientes: ClienteOption[];
   produtos: ProdutoOption[];
@@ -22,6 +21,198 @@ type CompraFormProps = {
   onCreated: () => void | Promise<void>;
   onCancel?: () => void;
 };
+
+type ItemForm = {
+  id: string;
+  produtoId: string;
+  quantidade: string;
+  valorUnitario: string;
+};
+
+function formatCurrency(value: number) {
+  return new Intl.NumberFormat("pt-BR", {
+    style: "currency",
+    currency: "BRL",
+  }).format(value);
+}
+
+function createEmptyItem(): ItemForm {
+  return {
+    id: crypto.randomUUID(),
+    produtoId: "",
+    quantidade: "1",
+    valorUnitario: "",
+  };
+}
+
+function getProdutoPreco(produto: ProdutoOption | undefined) {
+  if (!produto) return "";
+  const possibleValue =
+    (produto as any).valor ??
+    (produto as any).preco ??
+    (produto as any).valorUnitario ??
+    (produto as any).precoVenda;
+
+  if (
+    typeof possibleValue === "number" &&
+    Number.isFinite(possibleValue) &&
+    possibleValue > 0
+  ) {
+    return String(possibleValue);
+  }
+
+  return "";
+}
+
+type SearchableSelectProps<T> = {
+  label: string;
+  placeholder: string;
+  emptyMessage: string;
+  options: T[];
+  value: string;
+  onChange: (value: string) => void;
+  getOptionValue: (option: T) => string;
+  getOptionLabel: (option: T) => string;
+  className?: string;
+};
+
+function SearchableSelect<T>({
+  label,
+  placeholder,
+  emptyMessage,
+  options,
+  value,
+  onChange,
+  getOptionValue,
+  getOptionLabel,
+  className = "",
+}: SearchableSelectProps<T>) {
+  const [query, setQuery] = useState("");
+  const [open, setOpen] = useState(false);
+  const wrapperRef = useRef<HTMLDivElement | null>(null);
+
+  const selectedOption = useMemo(
+    () => options.find((option) => getOptionValue(option) === value),
+    [options, value, getOptionValue]
+  );
+
+  const filteredOptions = useMemo(() => {
+    const normalizedQuery = query.trim().toLowerCase();
+
+    if (!normalizedQuery) return options.slice(0, 12);
+
+    return options
+      .filter((option) =>
+        getOptionLabel(option).toLowerCase().includes(normalizedQuery)
+      )
+      .slice(0, 12);
+  }, [options, query, getOptionLabel]);
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (
+        wrapperRef.current &&
+        !wrapperRef.current.contains(event.target as Node)
+      ) {
+        setOpen(false);
+      }
+    }
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  useEffect(() => {
+    if (!open && selectedOption) {
+      setQuery(getOptionLabel(selectedOption));
+    }
+
+    if (!open && !selectedOption) {
+      setQuery("");
+    }
+  }, [open, selectedOption, getOptionLabel]);
+
+  return (
+    <div className={className}>
+      <label className="mb-1.5 block text-sm font-medium text-zinc-800">
+        {label}
+      </label>
+
+      <div ref={wrapperRef} className="relative">
+        <div className="relative">
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400" />
+
+          <input
+            type="text"
+            value={open ? query : selectedOption ? getOptionLabel(selectedOption) : query}
+            onFocus={() => setOpen(true)}
+            onChange={(e) => {
+              setQuery(e.target.value);
+              setOpen(true);
+
+              if (!e.target.value.trim()) {
+                onChange("");
+              }
+            }}
+            placeholder={placeholder}
+            className="w-full rounded-xl border border-zinc-200 bg-white py-2.5 pl-9 pr-10 text-sm outline-none placeholder:text-zinc-400 focus:border-zinc-400"
+          />
+
+          {(value || query) && (
+            <button
+              type="button"
+              onClick={() => {
+                setQuery("");
+                onChange("");
+                setOpen(false);
+              }}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 transition hover:text-zinc-700"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          )}
+        </div>
+
+        {open ? (
+          <div className="absolute z-30 mt-2 max-h-64 w-full overflow-auto rounded-2xl border border-zinc-200 bg-white p-2 shadow-xl">
+            {filteredOptions.length ? (
+              <div className="space-y-1">
+                {filteredOptions.map((option) => {
+                  const optionValue = getOptionValue(option);
+                  const optionLabel = getOptionLabel(option);
+                  const isSelected = value === optionValue;
+
+                  return (
+                    <button
+                      key={optionValue}
+                      type="button"
+                      onClick={() => {
+                        onChange(optionValue);
+                        setQuery(optionLabel);
+                        setOpen(false);
+                      }}
+                      className={`w-full rounded-xl px-3 py-2 text-left text-sm transition ${
+                        isSelected
+                          ? "bg-zinc-900 text-white"
+                          : "text-zinc-700 hover:bg-zinc-100"
+                      }`}
+                    >
+                      {optionLabel}
+                    </button>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="rounded-xl px-3 py-2 text-sm text-zinc-500">
+                {emptyMessage}
+              </div>
+            )}
+          </div>
+        ) : null}
+      </div>
+    </div>
+  );
+}
 
 export function CompraForm({
   clientes,
@@ -31,10 +222,8 @@ export function CompraForm({
   onCancel,
 }: CompraFormProps) {
   const [clienteId, setClienteId] = useState("");
-  const [produtoId, setProdutoId] = useState("");
-  const [quantidade, setQuantidade] = useState("1");
-  const [valorUnitario, setValorUnitario] = useState("");
   const [dataCompra, setDataCompra] = useState("");
+  const [itens, setItens] = useState<ItemForm[]>([createEmptyItem()]);
   const [status, setStatus] = useState<
     "pendente" | "aprovada" | "recusada" | "cancelada"
   >("aprovada");
@@ -46,21 +235,74 @@ export function CompraForm({
 
   useEffect(() => {
     setClienteId(initialData?.clienteId ?? "");
-    setProdutoId(initialData?.produtoId ?? "");
-    setQuantidade(
-      initialData?.quantidade != null ? String(initialData.quantidade) : "1"
-    );
-    setValorUnitario(
-      initialData?.valorUnitario != null
-        ? String(initialData.valorUnitario)
-        : ""
-    );
     setDataCompra(
       initialData?.dataCompra
         ? initialData.dataCompra.slice(0, 10)
         : new Date().toISOString().slice(0, 10)
     );
+
+    if (initialData?.produtoId) {
+      setItens([
+        {
+          id: crypto.randomUUID(),
+          produtoId: initialData.produtoId ?? "",
+          quantidade:
+            initialData?.quantidade != null
+              ? String(initialData.quantidade)
+              : "1",
+          valorUnitario:
+            initialData?.valorUnitario != null
+              ? String(initialData.valorUnitario)
+              : "",
+        },
+      ]);
+    } else {
+      setItens([createEmptyItem()]);
+    }
   }, [initialData]);
+
+  const clienteSelecionado = useMemo(
+    () => clientes.find((cliente) => cliente.id === clienteId),
+    [clientes, clienteId]
+  );
+
+  const totalCompra = useMemo(() => {
+    return itens.reduce((acc, item) => {
+      const quantidade = Number(item.quantidade);
+      const valorUnitario = Number(item.valorUnitario);
+
+      if (
+        Number.isNaN(quantidade) ||
+        quantidade <= 0 ||
+        Number.isNaN(valorUnitario) ||
+        valorUnitario <= 0
+      ) {
+        return acc;
+      }
+
+      return acc + quantidade * valorUnitario;
+    }, 0);
+  }, [itens]);
+
+  function updateItem(itemId: string, patch: Partial<ItemForm>) {
+    setItens((current) =>
+      current.map((item) => (item.id === itemId ? { ...item, ...patch } : item))
+    );
+  }
+
+  function addItem() {
+    setItens((current) => [...current, createEmptyItem()]);
+  }
+
+  function removeItem(itemId: string) {
+    setItens((current) => {
+      if (current.length === 1) {
+        return [createEmptyItem()];
+      }
+
+      return current.filter((item) => item.id !== itemId);
+    });
+  }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -69,31 +311,49 @@ export function CompraForm({
     setError(null);
 
     try {
-      const quantidadeNumber = Number(quantidade);
-      const valorUnitarioNumber = Number(valorUnitario);
-
       if (!clienteId) {
         throw new Error("Selecione um cliente.");
       }
 
-      if (!produtoId) {
-        throw new Error("Selecione um produto.");
-      }
-
-      if (!quantidadeNumber || Number.isNaN(quantidadeNumber) || quantidadeNumber <= 0) {
-        throw new Error("Informe uma quantidade válida.");
-      }
-
-      if (
-        !valorUnitarioNumber ||
-        Number.isNaN(valorUnitarioNumber) ||
-        valorUnitarioNumber <= 0
-      ) {
-        throw new Error("Informe um valor unitário válido.");
-      }
-
       if (!dataCompra) {
         throw new Error("Informe a data da compra.");
+      }
+
+      const normalizedItens = itens.map((item, index) => {
+        const quantidadeNumber = Number(item.quantidade);
+        const valorUnitarioNumber = Number(item.valorUnitario);
+
+        if (!item.produtoId) {
+          throw new Error(`Selecione o produto do item ${index + 1}.`);
+        }
+
+        if (
+          !quantidadeNumber ||
+          Number.isNaN(quantidadeNumber) ||
+          quantidadeNumber <= 0
+        ) {
+          throw new Error(`Informe uma quantidade válida no item ${index + 1}.`);
+        }
+
+        if (
+          !valorUnitarioNumber ||
+          Number.isNaN(valorUnitarioNumber) ||
+          valorUnitarioNumber <= 0
+        ) {
+          throw new Error(
+            `Informe um valor unitário válido no item ${index + 1}.`
+          );
+        }
+
+        return {
+          produtoId: item.produtoId,
+          quantidade: quantidadeNumber,
+          valorUnitario: valorUnitarioNumber,
+        };
+      });
+
+      if (!normalizedItens.length) {
+        throw new Error("Adicione pelo menos um item.");
       }
 
       const payload = isEditing
@@ -101,26 +361,16 @@ export function CompraForm({
             id: initialData?.id,
             clienteId,
             dataCompra,
-            origem: "manual",
-            itens: [
-              {
-                produtoId,
-                quantidade: quantidadeNumber,
-                valorUnitario: valorUnitarioNumber,
-              },
-            ],
+            origem: "lojista",
+            status: "aprovada",
+            itens: normalizedItens,
           }
         : {
             clienteId,
             dataCompra,
-            origem: "manual",
-            itens: [
-              {
-                produtoId,
-                quantidade: quantidadeNumber,
-                valorUnitario: valorUnitarioNumber,
-              },
-            ],
+            origem: "lojista",
+            status: "aprovada",
+            itens: normalizedItens,
           };
 
       const response = await authFetch("/api/lojista/compras", {
@@ -148,9 +398,7 @@ export function CompraForm({
       }
 
       setClienteId("");
-      setProdutoId("");
-      setQuantidade("1");
-      setValorUnitario("");
+      setItens([createEmptyItem()]);
       setDataCompra(new Date().toISOString().slice(0, 10));
       setStatus("aprovada");
 
@@ -162,94 +410,203 @@ export function CompraForm({
     }
   }
 
-   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
-      <div className="grid gap-4 md:grid-cols-2">
-        <div className="md:col-span-2">
-          <label className="mb-1.5 block text-sm font-medium text-zinc-800">
-            Cliente
-          </label>
+  return (
+    <form onSubmit={handleSubmit} className="space-y-5">
+      <div className="rounded-3xl border border-zinc-200 bg-white p-4 shadow-sm md:p-5">
+        <div className="mb-4 flex items-start justify-between gap-4">
+          <div>
+            <h3 className="text-base font-semibold text-zinc-900">
+              {isEditing ? "Editar venda" : "Novo lançamento"}
+            </h3>
+            <p className="mt-1 text-sm text-zinc-500">
+              Monte a compra como um mini-caixa, adicionando os itens abaixo.
+            </p>
+          </div>
 
-          <select
+          <div className="min-w-[160px] rounded-2xl bg-zinc-950 px-4 py-3 text-white">
+            <p className="text-[11px] uppercase tracking-[0.14em] text-zinc-400">
+              Total da compra
+            </p>
+            <strong className="mt-1 block text-lg font-semibold">
+              {formatCurrency(totalCompra)}
+            </strong>
+          </div>
+        </div>
+
+        <div className="grid gap-4 md:grid-cols-[1.4fr_0.8fr]">
+          <SearchableSelect
+            label="Cliente"
+            placeholder="Digite para buscar um cliente"
+            emptyMessage="Nenhum cliente encontrado."
+            options={clientes}
             value={clienteId}
-            onChange={(e) => setClienteId(e.target.value)}
-            className="w-full rounded-xl border border-zinc-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-zinc-400"
-            required
+            onChange={setClienteId}
+            getOptionValue={(cliente) => cliente.id}
+            getOptionLabel={(cliente) => cliente.nome}
+          />
+
+          <div>
+            <label className="mb-1.5 block text-sm font-medium text-zinc-800">
+              Data da compra
+            </label>
+
+            <input
+              type="date"
+              value={dataCompra}
+              onChange={(e) => setDataCompra(e.target.value)}
+              className="w-full rounded-xl border border-zinc-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-zinc-400"
+              required
+            />
+          </div>
+        </div>
+
+        {clienteSelecionado ? (
+          <div className="mt-4 rounded-2xl border border-zinc-200 bg-zinc-50 px-4 py-3 text-sm text-zinc-600">
+            Cliente selecionado:{" "}
+            <span className="font-medium text-zinc-900">
+              {clienteSelecionado.nome}
+            </span>
+          </div>
+        ) : null}
+      </div>
+
+      <div className="rounded-3xl border border-zinc-200 bg-white p-4 shadow-sm md:p-5">
+        <div className="mb-4 flex items-center justify-between gap-3">
+          <div>
+            <h4 className="text-sm font-semibold text-zinc-900">
+              Itens da compra
+            </h4>
+            <p className="mt-1 text-sm text-zinc-500">
+              Adicione um ou mais produtos ao lançamento.
+            </p>
+          </div>
+
+          <button
+            type="button"
+            onClick={addItem}
+            className="inline-flex items-center gap-2 rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm font-medium text-zinc-700 transition hover:border-zinc-300 hover:bg-zinc-50"
           >
-            <option value="">Selecione um cliente</option>
-            {clientes.map((cliente) => (
-              <option key={cliente.id} value={cliente.id}>
-                {cliente.nome}
-              </option>
-            ))}
-          </select>
+            <Plus className="h-4 w-4" />
+            Adicionar item
+          </button>
         </div>
 
-        <div className="md:col-span-2">
-          <label className="mb-1.5 block text-sm font-medium text-zinc-800">
-            Produto
-          </label>
+        <div className="space-y-4">
+          {itens.map((item, index) => {
+            const produtoSelecionado = produtos.find(
+              (produto) => produto.id === item.produtoId
+            );
 
-          <select
-            value={produtoId}
-            onChange={(e) => setProdutoId(e.target.value)}
-            className="w-full rounded-xl border border-zinc-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-zinc-400"
-            required
-          >
-            <option value="">Selecione um produto</option>
-            {produtos.map((produto) => (
-              <option key={produto.id} value={produto.id}>
-                {produto.descricao}
-              </option>
-            ))}
-          </select>
-        </div>
+            const subtotal =
+              Number(item.quantidade || 0) * Number(item.valorUnitario || 0);
 
-        <div>
-          <label className="mb-1.5 block text-sm font-medium text-zinc-800">
-            Quantidade
-          </label>
+            return (
+              <div
+                key={item.id}
+                className="rounded-2xl border border-zinc-200 bg-zinc-50/70 p-4"
+              >
+                <div className="mb-4 flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-semibold text-zinc-900">
+                      Item {index + 1}
+                    </p>
+                    <p className="text-xs text-zinc-500">
+                      Subtotal: {formatCurrency(Number.isFinite(subtotal) ? subtotal : 0)}
+                    </p>
+                  </div>
 
-          <input
-            type="number"
-            min="1"
-            step="1"
-            value={quantidade}
-            onChange={(e) => setQuantidade(e.target.value)}
-            className="w-full rounded-xl border border-zinc-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-zinc-400"
-            required
-          />
-        </div>
+                  <button
+                    type="button"
+                    onClick={() => removeItem(item.id)}
+                    className="inline-flex items-center gap-2 rounded-xl border border-red-200 bg-white px-3 py-2 text-sm font-medium text-red-600 transition hover:bg-red-50"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                    Remover
+                  </button>
+                </div>
 
-        <div>
-          <label className="mb-1.5 block text-sm font-medium text-zinc-800">
-            Valor unitário
-          </label>
+                <div className="grid gap-4 md:grid-cols-12">
+                  <SearchableSelect
+                    label="Produto"
+                    placeholder="Digite para buscar um produto"
+                    emptyMessage="Nenhum produto encontrado."
+                    options={produtos}
+                    value={item.produtoId}
+                    onChange={(produtoId) => {
+                      const produto = produtos.find((p) => p.id === produtoId);
 
-          <input
-            type="number"
-            step="0.01"
-            min="0.01"
-            value={valorUnitario}
-            onChange={(e) => setValorUnitario(e.target.value)}
-            placeholder="100.00"
-            className="w-full rounded-xl border border-zinc-200 bg-white px-3 py-2.5 text-sm outline-none placeholder:text-zinc-400 focus:border-zinc-400"
-            required
-          />
-        </div>
+                      updateItem(item.id, {
+                        produtoId,
+                        valorUnitario:
+                          item.valorUnitario && item.valorUnitario.trim()
+                            ? item.valorUnitario
+                            : getProdutoPreco(produto),
+                      });
+                    }}
+                    getOptionValue={(produto) => produto.id}
+                    getOptionLabel={(produto) => produto.descricao}
+                    className="md:col-span-6"
+                  />
 
-        <div className="md:col-span-2">
-          <label className="mb-1.5 block text-sm font-medium text-zinc-800">
-            Data da compra
-          </label>
+                  <div className="md:col-span-2">
+                    <label className="mb-1.5 block text-sm font-medium text-zinc-800">
+                      Quantidade
+                    </label>
 
-          <input
-            type="date"
-            value={dataCompra}
-            onChange={(e) => setDataCompra(e.target.value)}
-            className="w-full rounded-xl border border-zinc-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-zinc-400"
-            required
-          />
+                    <input
+                      type="number"
+                      min="1"
+                      step="1"
+                      value={item.quantidade}
+                      onChange={(e) =>
+                        updateItem(item.id, { quantidade: e.target.value })
+                      }
+                      className="w-full rounded-xl border border-zinc-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-zinc-400"
+                      required
+                    />
+                  </div>
+
+                  <div className="md:col-span-2">
+                    <label className="mb-1.5 block text-sm font-medium text-zinc-800">
+                      Valor unitário
+                    </label>
+
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0.01"
+                      value={item.valorUnitario}
+                      onChange={(e) =>
+                        updateItem(item.id, { valorUnitario: e.target.value })
+                      }
+                      placeholder="0,00"
+                      className="w-full rounded-xl border border-zinc-200 bg-white px-3 py-2.5 text-sm outline-none placeholder:text-zinc-400 focus:border-zinc-400"
+                      required
+                    />
+                  </div>
+
+                  <div className="md:col-span-2">
+                    <label className="mb-1.5 block text-sm font-medium text-zinc-800">
+                      Total
+                    </label>
+
+                    <div className="flex h-[42px] items-center rounded-xl border border-zinc-200 bg-white px-3 text-sm font-medium text-zinc-900">
+                      {formatCurrency(Number.isFinite(subtotal) ? subtotal : 0)}
+                    </div>
+                  </div>
+                </div>
+
+                {produtoSelecionado ? (
+                  <div className="mt-3 text-xs text-zinc-500">
+                    Produto selecionado:{" "}
+                    <span className="font-medium text-zinc-700">
+                      {produtoSelecionado.descricao}
+                    </span>
+                  </div>
+                ) : null}
+              </div>
+            );
+          })}
         </div>
       </div>
 
@@ -259,30 +616,37 @@ export function CompraForm({
         </div>
       ) : null}
 
-      <div className="flex justify-end gap-2">
-        {onCancel ? (
-          <button
-            type="button"
-            onClick={onCancel}
-            className="inline-flex items-center justify-center rounded-xl border border-zinc-200 bg-white px-4 py-2.5 text-sm font-medium text-zinc-700"
-          >
-            Cancelar
-          </button>
-        ) : null}
+      <div className="flex flex-col-reverse gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <div className="rounded-2xl border border-zinc-200 bg-zinc-50 px-4 py-3 text-sm text-zinc-600">
+          <span className="font-medium text-zinc-900">{itens.length}</span>{" "}
+          {itens.length === 1 ? "item" : "itens"} na compra
+        </div>
 
-        <button
-          type="submit"
-          disabled={loading}
-          className="inline-flex items-center justify-center rounded-xl bg-zinc-900 px-4 py-2.5 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-60"
-        >
-          {loading
-            ? isEditing
-              ? "Salvando..."
-              : "Registrando..."
-            : isEditing
-            ? "Salvar alterações"
-            : "Registrar venda"}
-        </button>
+        <div className="flex justify-end gap-2">
+          {onCancel ? (
+            <button
+              type="button"
+              onClick={onCancel}
+              className="inline-flex items-center justify-center rounded-xl border border-zinc-200 bg-white px-4 py-2.5 text-sm font-medium text-zinc-700"
+            >
+              Cancelar
+            </button>
+          ) : null}
+
+          <button
+            type="submit"
+            disabled={loading}
+            className="inline-flex items-center justify-center rounded-xl bg-zinc-900 px-4 py-2.5 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {loading
+              ? isEditing
+                ? "Salvando..."
+                : "Registrando..."
+              : isEditing
+              ? "Salvar alterações"
+              : "Registrar venda"}
+          </button>
+        </div>
       </div>
     </form>
   );

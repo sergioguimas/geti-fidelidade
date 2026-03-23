@@ -75,7 +75,7 @@ export function ClientesTable({ clientes, onEdit, onDelete }: ClientesTableProps
               return (
                 <tr key={cliente.id} className="hover:bg-zinc-50/80">
                   <td className="px-4 py-4 align-middle">
-                    <StatusBadge status={cliente.ativo ? "ativo" : "inativo"} />
+                    <StatusBadge status={cliente.fidelidade?.ativo ? "ativo" : "inativo"} />
                   </td>
                   <td className="px-4 py-4 align-middle">
                     <div>

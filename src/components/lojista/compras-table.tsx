@@ -137,7 +137,7 @@ export function ComprasTable({
               </td>
 
               <td className="px-4 py-4 align-middle text-sm text-zinc-700">
-                {compra.origem === "lojista" ? "Lojista" : "Cliente"}
+                {compra.origem === "lojista" ? "Lojista" : compra.origem === "cliente" ? "Cliente" : "Sistema"}
               </td>
 
               <td className="px-4 py-4 align-middle">

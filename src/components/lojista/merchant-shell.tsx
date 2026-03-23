@@ -6,13 +6,13 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
   Bell,
+  Boxes,
   ChevronRight,
   LayoutDashboard,
   LogOut,
   Menu,
   Receipt,
   Gift,
-  UserCircle2,
   Users,
   X,
   Settings,
@@ -43,7 +43,7 @@ const navigation: NavItem[] = [
   {
     label: "Produtos",
     href: "/lojista/produtos",
-    icon: Users,
+    icon: Boxes,
   },
   {
     label: "Vendas",

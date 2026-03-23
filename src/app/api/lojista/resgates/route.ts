@@ -4,18 +4,11 @@ import { listResgates, processarResgate } from "@/lib/merchant/resgates";
 
 export async function GET(request: NextRequest) {
   try {
+    const { supabase, lojistaId } = await requireLojistaContext(request);
     const { searchParams } = new URL(request.url);
-    const lojistaId = searchParams.get("lojistaId");
     const busca = searchParams.get("busca") ?? undefined;
 
-    if (!lojistaId) {
-      return NextResponse.json(
-        { error: "lojistaId é obrigatório." },
-        { status: 400 }
-      );
-    }
-
-    const resgates = await listResgates(lojistaId, busca);
+    const resgates = await listResgates(supabase, lojistaId, busca);
     return NextResponse.json({ data: resgates });
   } catch (error) {
     const message =
@@ -27,6 +20,7 @@ export async function GET(request: NextRequest) {
 
 export async function PATCH(request: NextRequest) {
   try {
+    const { supabase, lojistaId } = await requireLojistaContext(request);
     const body = await request.json();
 
     if (!body.resgateId || !body.status) {
@@ -43,7 +37,7 @@ export async function PATCH(request: NextRequest) {
       );
     }
 
-    const result = await processarResgate({
+    const result = await processarResgate(supabase, lojistaId, {
       resgateId: body.resgateId,
       status: body.status,
     });

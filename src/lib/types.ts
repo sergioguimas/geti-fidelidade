@@ -80,6 +80,23 @@ export type CompraListItem = {
   compra_itens: CompraItemListItem[];
 };
 
+export type ProdutoListItem = {
+  id: string;
+  lojista_id: string;
+  descricao: string;
+  teto_percentual: number;
+  ativo: boolean;
+  created_at: string;
+  updated_at: string | null;
+};
+
+export type ProdutoFormInitialData = {
+  id: string;
+  descricao: string;
+  tetoPercentual: number;
+  ativo: boolean;
+} | null;
+
 export type ProdutoOption = {
   id: string;
   descricao: string;

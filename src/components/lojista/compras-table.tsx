@@ -65,8 +65,8 @@ export function ComprasTable({
   if (!compras.length) {
     return (
       <TableEmptyState
-        title="Nenhuma compra encontrada"
-        description="Registre a primeira compra para começar a pontuar clientes."
+        title="Nenhuma venda encontrada"
+        description="Registre a primeira venda para começar a pontuar clientes."
       />
     );
   }

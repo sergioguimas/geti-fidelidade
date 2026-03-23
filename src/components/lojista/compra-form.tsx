@@ -135,15 +135,15 @@ export function CompraForm({
       try {
         result = JSON.parse(text);
       } catch {
-        throw new Error("A API de compras não retornou JSON válido.");
+        throw new Error("A API de vendas não retornou JSON válido.");
       }
 
       if (!response.ok) {
         throw new Error(
           result.error ||
             (isEditing
-              ? "Erro ao atualizar compra."
-              : "Erro ao registrar compra.")
+              ? "Erro ao atualizar venda."
+              : "Erro ao registrar venda.")
         );
       }
 
@@ -281,7 +281,7 @@ export function CompraForm({
               : "Registrando..."
             : isEditing
             ? "Salvar alterações"
-            : "Registrar compra"}
+            : "Registrar venda"}
         </button>
       </div>
     </form>

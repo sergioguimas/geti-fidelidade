@@ -88,7 +88,7 @@ async function ensureClienteFidelidade(
 
     return existing.id;
   }
-
+  console.log("garantindo vínculo clientes_fidelidade");
   const { data, error } = await supabase
     .from("clientes_fidelidade")
     .insert({
@@ -272,42 +272,66 @@ export async function createCliente(
   const cnpj = normalizeCnpj(input.cnpj);
 
   let cliente: any = null;
+  let clienteJaExistia = false;
 
   if (cnpj) {
     cliente = await findGlobalClienteByCnpj(cnpj);
+    clienteJaExistia = !!cliente;
   }
 
   if (!cliente) {
-    const { data, error } = await supabase
-      .from("clientes")
-      .insert({
-        nome,
-        telefone,
-        email,
-        cnpj,
-        pode_fazer_login: false,
-      })
-      .select(`
-        id,
-        nome,
-        telefone,
-        email,
-        cnpj,
-        auth_user_id,
-        pode_fazer_login,
-        acesso_ativado_em,
-        ultimo_login_em,
-        created_at,
-        updated_at
-      `)
-      .single();
+    const { error: insertError } = await supabase.from("clientes").insert({
+      nome,
+      telefone,
+      email,
+      cnpj,
+      pode_fazer_login: false,
+    });
 
-    if (error || !data) {
-      throw new Error(error?.message ?? "Erro ao criar cliente.");
+    if (insertError) {
+      throw new Error(insertError.message);
     }
 
-    cliente = data;
-  } else {
+    if (cnpj) {
+      cliente = await findGlobalClienteByCnpj(cnpj);
+    } else {
+      const admin = getSupabaseAdmin();
+
+      const { data, error } = await admin
+        .from("clientes")
+        .select(`
+          id,
+          nome,
+          telefone,
+          email,
+          cnpj,
+          auth_user_id,
+          pode_fazer_login,
+          acesso_ativado_em,
+          ultimo_login_em,
+          created_at,
+          updated_at
+        `)
+        .eq("email", email)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (error || !data) {
+        throw new Error(error?.message ?? "Erro ao localizar cliente recém-criado.");
+      }
+
+      cliente = data;
+    }
+  }
+
+  await ensureClienteFidelidade(supabase, {
+    clienteId: cliente.id,
+    lojistaId,
+    ativo: input.ativo ?? true,
+  });
+
+  if (clienteJaExistia) {
     const patch: Record<string, string> = {};
 
     if (!cliente.nome && nome) patch.nome = nome;
@@ -341,12 +365,6 @@ export async function createCliente(
       cliente = data;
     }
   }
-
-  await ensureClienteFidelidade(supabase, {
-    clienteId: cliente.id,
-    lojistaId,
-    ativo: true,
-  });
 
   if (input.podeFazerLogin) {
     await ensureClienteAuthAccess(supabase, cliente);

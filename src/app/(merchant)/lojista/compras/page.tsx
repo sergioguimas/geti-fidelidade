@@ -199,9 +199,9 @@ export default function ComprasPage() {
     <div className="fundo">
       <section className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Compras</h1>
+          <h1 className="text-2xl font-semibold tracking-tight">Vendas</h1>
           <p className="mt-1 text-sm text-zinc-600">
-            Registre, edite e acompanhe compras que alimentam a pontuação real dos clientes.
+            Registre, edite e acompanhe vendas que alimentam a pontuação real dos clientes.
           </p>
         </div>
 
@@ -211,7 +211,7 @@ export default function ComprasPage() {
           className="inline-flex items-center justify-center gap-2 rounded-xl bg-zinc-900 px-4 py-2.5 text-sm font-medium text-white"
         >
           <Receipt className="h-4 w-4" />
-          {openForm && !editingCompra ? "Fechar lançamento" : "Nova compra"}
+          {openForm && !editingCompra ? "Fechar lançamento" : "Nova venda"}
         </button>
       </section>
 
@@ -224,7 +224,7 @@ export default function ComprasPage() {
             <p className="mt-1 text-sm text-zinc-500">
               {editingCompra
                 ? "Atualize os dados da compra selecionada."
-                : "Compras lançadas pelo lojista entram como aprovadas e já processam a fidelidade."}
+                : "Vendas lançadas pelo lojista entram como aprovadas e já processam a fidelidade."}
             </p>
           </div>
 

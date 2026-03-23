@@ -1,7 +1,11 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { ResgateActionInput, ResgateListItem } from "@/lib/types";
 
-export async function listResgates(supabase: SupabaseClient, lojistaId: string, busca?: string) {
+export async function listResgates(
+  supabase: SupabaseClient,
+  lojistaId: string,
+  busca?: string
+) {
   const { data, error } = await supabase
     .from("resgates")
     .select(`
@@ -58,7 +62,32 @@ export async function listResgates(supabase: SupabaseClient, lojistaId: string, 
   return normalized;
 }
 
-export async function processarResgate(supabase: SupabaseClient, input: ResgateActionInput) {
+export async function processarResgate(
+  supabase: SupabaseClient,
+  lojistaId: string,
+  input: ResgateActionInput
+) {
+  const { data: resgate, error: resgateError } = await supabase
+    .from("resgates")
+    .select(`
+      id,
+      lojista_id,
+      status
+    `)
+    .eq("id", input.resgateId)
+    .eq("lojista_id", lojistaId)
+    .single();
+
+  if (resgateError || !resgate) {
+    throw new Error(
+      resgateError?.message ?? "Resgate não encontrado para este lojista."
+    );
+  }
+
+  if (resgate.status !== "pendente") {
+    throw new Error("Somente resgates pendentes podem ser processados.");
+  }
+
   const { error } = await supabase.rpc("fn_processar_status_resgate", {
     p_resgate_id: input.resgateId,
     p_novo_status: input.status,
@@ -81,6 +110,7 @@ export async function processarResgate(supabase: SupabaseClient, input: ResgateA
       decidido_em
     `)
     .eq("id", input.resgateId)
+    .eq("lojista_id", lojistaId)
     .single();
 
   if (fetchError) {

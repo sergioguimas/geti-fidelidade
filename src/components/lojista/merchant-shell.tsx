@@ -41,6 +41,11 @@ const navigation: NavItem[] = [
     icon: Users,
   },
   {
+    label: "Produtos",
+    href: "/lojista/produtos",
+    icon: Users,
+  },
+  {
     label: "Vendas",
     href: "/lojista/compras",
     icon: Receipt,

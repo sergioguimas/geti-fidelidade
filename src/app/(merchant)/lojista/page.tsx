@@ -15,8 +15,7 @@ import type {
 } from "@/lib/types";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { RangeSliderDrag } from "@/components/lojista/range-slider";
-
-const LOJISTA_ID = "9f2a1cb4-f2cc-41be-b4ae-3af0d61863c2";
+import { authFetch } from "@/lib/api";
 
 function formatCurrency(value: number) {
   return new Intl.NumberFormat("pt-BR", {
@@ -384,7 +383,6 @@ export default function LojistaDashboardPage() {
 
   const queryString = useMemo(() => {
     const params = new URLSearchParams({
-      lojistaId: LOJISTA_ID,
       range,
     });
 
@@ -396,7 +394,7 @@ export default function LojistaDashboardPage() {
     setError(null);
 
     try {
-      const response = await fetch(`/api/lojista/dashboard?${queryString}`, {
+      const response = await authFetch(`/api/lojista/dashboard?${queryString}`, {
         cache: "no-store",
       });
 

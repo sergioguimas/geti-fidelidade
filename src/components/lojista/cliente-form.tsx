@@ -1,80 +1,72 @@
 "use client";
 
-import { FormEvent, useEffect, useState } from "react";
+import { useState } from "react";
+import { ClienteFormInitialData } from "@/lib/types";
+import { authFetch } from "@/lib/api";
 
-type ClienteFormInitialData = {
-  id: string;
-  nome: string;
-  telefone: string;
-  email: string;
-  cnpj: string;
-  ativo?: boolean;
-} | null;
-
-type ClienteFormProps = {
-  lojistaId: string;
-  initialData?: ClienteFormInitialData;
-  onCreated: () => void | Promise<void>;
-  onCancel?: () => void;
+type Props = {
+  initialData: ClienteFormInitialData;
+  onCancel: () => void;
+  onCreated: () => void;
 };
 
-export function ClienteForm({
-  lojistaId,
-  initialData = null,
-  onCreated,
-  onCancel,
-}: ClienteFormProps) {
-  const [nome, setNome] = useState("");
-  const [telefone, setTelefone] = useState("");
-  const [email, setEmail] = useState("");
-  const [cnpj, setCnpj] = useState("");
-  const [ativo, setAtivo] = useState(true);
+export function ClienteForm({ initialData, onCancel, onCreated }: Props) {
+  const isEditing = !!initialData;
+
+  const [nome, setNome] = useState(initialData?.nome ?? "");
+  const [telefone, setTelefone] = useState(initialData?.telefone ?? "");
+  const [email, setEmail] = useState(initialData?.email ?? "");
+  const [cnpj, setCnpj] = useState(initialData?.cnpj ?? "");
+  const [ativo, setAtivo] = useState(initialData?.ativo ?? true);
+  const [podeFazerLogin, setPodeFazerLogin] = useState(
+    initialData?.podeFazerLogin ?? false
+  );
+
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const isEditing = Boolean(initialData?.id);
-
-  useEffect(() => {
-    setNome(initialData?.nome ?? "");
-    setTelefone(initialData?.telefone ?? "");
-    setEmail(initialData?.email ?? "");
-    setCnpj(initialData?.cnpj ?? "");
-    setAtivo(initialData?.ativo ?? true);
-  }, [initialData]);
-
-  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setLoading(true);
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
     setError(null);
 
-    try {
-      const endpoint = "/api/lojista/clientes";
-      const method = isEditing ? "PATCH" : "POST";
+    if (!nome.trim()) {
+      setError("Nome é obrigatório.");
+      return;
+    }
 
-      const response = await fetch(endpoint, {
-        method,
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(
-          isEditing
-            ? {
-                id: initialData?.id,
-                nome,
-                telefone,
-                email,
-                cnpj,
-                ativo,
-              }
-            : {
-                lojistaId,
-                nome,
-                telefone,
-                email,
-                cnpj,
-              }
-        ),
-      });
+    if (podeFazerLogin && !email.trim()) {
+      setError("Para liberar login, informe um email.");
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      const payload = {
+        nome: nome.trim(),
+        telefone: telefone?.trim() || null,
+        email: email?.trim() || null,
+        cnpj: cnpj?.trim() || null,
+        ativo,
+        podeFazerLogin,
+      };
+
+      let response: Response;
+
+      if (isEditing) {
+        response = await authFetch("/api/lojista/clientes", {
+          method: "PATCH",
+          body: JSON.stringify({
+            id: initialData!.id,
+            ...payload,
+          }),
+        });
+      } else {
+        response = await authFetch("/api/lojista/clientes", {
+          method: "POST",
+          body: JSON.stringify(payload),
+        });
+      }
 
       const text = await response.text();
 
@@ -82,25 +74,14 @@ export function ClienteForm({
       try {
         result = JSON.parse(text);
       } catch {
-        throw new Error("A API de clientes não retornou JSON válido.");
+        throw new Error("A API não retornou um JSON válido.");
       }
 
       if (!response.ok) {
-        throw new Error(
-          result.error ||
-            (isEditing
-              ? "Erro ao atualizar cliente."
-              : "Erro ao cadastrar cliente.")
-        );
+        throw new Error(result.error || "Erro ao salvar cliente.");
       }
 
-      setNome("");
-      setTelefone("");
-      setEmail("");
-      setCnpj("");
-      setAtivo(true);
-
-      await onCreated();
+      onCreated();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erro inesperado.");
     } finally {
@@ -109,103 +90,107 @@ export function ClienteForm({
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
-      <div className="grid gap-4 md:grid-cols-2">
-        <div className="md:col-span-2">
-          <label className="mb-1.5 block text-sm font-medium text-zinc-800">
-            Nome
-          </label>
-          <input
-            value={nome}
-            onChange={(e) => setNome(e.target.value)}
-            placeholder="Nome do cliente"
-            className="w-full rounded-xl border border-zinc-200 bg-white px-3 py-2.5 text-sm outline-none ring-0 placeholder:text-zinc-400 focus:border-zinc-400"
-            required
-          />
-        </div>
-
-        <div>
-          <label className="mb-1.5 block text-sm font-medium text-zinc-800">
-            Telefone
-          </label>
-          <input
-            value={telefone}
-            onChange={(e) => setTelefone(e.target.value)}
-            placeholder="(00) 00000-0000"
-            className="w-full rounded-xl border border-zinc-200 bg-white px-3 py-2.5 text-sm outline-none placeholder:text-zinc-400 focus:border-zinc-400"
-          />
-        </div>
-
-        <div>
-          <label className="mb-1.5 block text-sm font-medium text-zinc-800">
-            CNPJ
-          </label>
-          <input
-            value={cnpj}
-            onChange={(e) => setCnpj(e.target.value)}
-            placeholder="00.000.000/0000-00"
-            className="w-full rounded-xl border border-zinc-200 bg-white px-3 py-2.5 text-sm outline-none placeholder:text-zinc-400 focus:border-zinc-400"
-          />
-        </div>
-
-        <div className="md:col-span-2">
-          <label className="mb-1.5 block text-sm font-medium text-zinc-800">
-            E-mail
-          </label>
-          <input
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            placeholder="cliente@email.com"
-            className="w-full rounded-xl border border-zinc-200 bg-white px-3 py-2.5 text-sm outline-none placeholder:text-zinc-400 focus:border-zinc-400"
-          />
-        </div>
-
-        {isEditing ? (
-          <div className="md:col-span-2">
-            <label className="inline-flex items-center gap-2 text-sm text-zinc-700">
-              <input
-                type="checkbox"
-                checked={ativo}
-                onChange={(e) => setAtivo(e.target.checked)}
-              />
-              Cliente ativo
-            </label>
+    <form onSubmit={handleSubmit}>
+      <h2 className="text-lg font-semibold text-white">
+        {isEditing ? "Editar cliente" : "Novo cliente"}
+      </h2>
+      <div className="grid gap-4 lg:grid-cols-2 md:grid-cols-2">
+        <div className="md:col-span-2"></div>
+          {/* Nome */}
+          <div>
+            <label className="mb-1.5 block text-sm font-medium text-zinc-800">Nome</label>
+            <input
+              value={nome}
+              onChange={(e) => setNome(e.target.value)}
+              className="w-full rounded-xl border border-zinc-200 bg-white px-3 py-2.5 text-sm outline-none ring-0 placeholder:text-zinc-400 focus:border-zinc-400"
+            />
           </div>
-        ) : null}
-      </div>
 
-      {error ? (
-        <div className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
-          {error}
+          {/* Telefone */}
+          <div>
+            <label className="mb-1.5 block text-sm font-medium text-zinc-800">Telefone</label>
+            <input
+              value={telefone}
+              onChange={(e) => setTelefone(e.target.value)}
+              className="w-full rounded-xl border border-zinc-200 bg-white px-3 py-2.5 text-sm outline-none ring-0 placeholder:text-zinc-400 focus:border-zinc-400"
+            />
+          </div>
+
+          {/* Email */}
+          <div>
+            <label className="mb-1.5 block text-sm font-medium text-zinc-800">Email</label>
+            <input
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              type="email"
+              className="w-full rounded-xl border border-zinc-200 bg-white px-3 py-2.5 text-sm outline-none ring-0 placeholder:text-zinc-400 focus:border-zinc-400"
+            />
+          </div>
+
+          {/* CNPJ */}
+          <div>
+            <label className="mb-1.5 block text-sm font-medium text-zinc-800">CNPJ</label>
+            <input
+              value={cnpj}
+              onChange={(e) => setCnpj(e.target.value)}
+              className="w-full rounded-xl border border-zinc-200 bg-white px-3 py-2.5 text-sm outline-none ring-0 placeholder:text-zinc-400 focus:border-zinc-400"
+            />
+          </div>
+
+          {/* Ativo na loja */}
+          <div className="flex items-center justify-between rounded-lg border border-zinc-800 p-3">
+            <span className="text-sm font-medium text-zinc-800">Cliente ativo nesta loja</span>
+            <input
+              type="checkbox"
+              checked={ativo}
+              onChange={(e) => setAtivo(e.target.checked)}
+            />
+          </div>
+
+          {/* Login */}
+          <div className="flex items-center justify-between rounded-lg border border-zinc-800 p-3">
+            <span className="text-sm font-medium text-zinc-800">Permitir login</span>
+            <input
+              type="checkbox"
+              checked={podeFazerLogin}
+              onChange={(e) => setPodeFazerLogin(e.target.checked)}
+            />
+          </div>
+
+          {/* Aviso */}
+          {podeFazerLogin && (
+            <p className="text-xs text-zinc-500">
+              O cliente receberá acesso ao sistema e poderá definir a senha no
+              primeiro login.
+            </p>
+          )}
+
+          {/* Erro */}
+          {error && (
+            <div className="rounded-lg border border-red-500/40 bg-red-500/10 px-3 py-2 text-sm text-red-400">
+              {error}
+            </div>
+          )}
+
+          {/* Ações */}
+          <div className="flex justify-end gap-2 pt-2">
+            <button
+              type="button"
+              onClick={onCancel}
+              className="rounded-lg border border-zinc-700 px-4 py-2 text-sm text-zinc-300 hover:bg-zinc-800"
+            >
+              Cancelar
+            </button>
+
+            <button
+              type="submit"
+              disabled={loading}
+              className="rounded-lg bg-white px-4 py-2 text-sm font-medium text-black hover:bg-zinc-200 disabled:opacity-50"
+            >
+              {loading ? "Salvando..." : "Salvar"}
+            </button>
+          </div>
         </div>
-      ) : null}
-
-      <div className="flex justify-end gap-2">
-        {onCancel ? (
-          <button
-            type="button"
-            onClick={onCancel}
-            className="inline-flex items-center justify-center rounded-xl border border-zinc-200 bg-white px-4 py-2.5 text-sm font-medium text-zinc-700"
-          >
-            Cancelar
-          </button>
-        ) : null}
-
-        <button
-          type="submit"
-          disabled={loading}
-          className="inline-flex items-center justify-center rounded-xl bg-zinc-900 px-4 py-2.5 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-60"
-        >
-          {loading
-            ? isEditing
-              ? "Salvando..."
-              : "Cadastrando..."
-            : isEditing
-            ? "Salvar alterações"
-            : "Cadastrar cliente"}
-        </button>
-      </div>
     </form>
   );
 }

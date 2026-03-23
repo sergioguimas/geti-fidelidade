@@ -2,32 +2,49 @@ export type UUID = string;
 export type CompraStatus = "pendente" | "aprovada" | "recusada" | "cancelada";
 export type OrigemCompra = "cliente" | "lojista";
 
+export type ClienteFidelidadeResumo = {
+  id: string;
+  ativo: boolean;
+  streak_atual: number;
+  saldo_disponivel: number;
+  saldo_pendente: number;
+  saldo_negativo: number;
+  ultima_compra_valida_em: string | null;
+};
+
 export type ClienteListItem = {
-  id: UUID;
-  lojista_id: UUID;
+  id: string;
+  nome: string;
+  telefone: string | null;
+  email: string | null;
+  cnpj: string | null;
+  auth_user_id: string | null;
+  pode_fazer_login: boolean;
+  acesso_ativado_em: string | null;
+  ultimo_login_em: string | null;
+  created_at: string;
+  updated_at: string | null;
+  fidelidade: ClienteFidelidadeResumo | null;
+};
+
+export type ClienteCreateInput = {
+  nome: string;
+  telefone?: string | null;
+  email?: string | null;
+  cnpj?: string | null;
+  ativo?: boolean;
+  podeFazerLogin?: boolean;
+};
+
+export type ClienteFormInitialData = {
+  id: string;
   nome: string;
   telefone: string | null;
   email: string | null;
   cnpj: string | null;
   ativo: boolean;
-  created_at: string;
-  updated_at: string;
-  fidelidade?: {
-    streak_atual: number;
-    saldo_disponivel: number;
-    saldo_pendente: number;
-    saldo_negativo: number;
-    ultima_compra_valida_em: string | null;
-  } | null;
-};
-
-export type ClienteCreateInput = {
-  lojistaId: UUID;
-  nome: string;
-  telefone?: string;
-  email?: string;
-  cnpj?: string;
-};
+  podeFazerLogin: boolean;
+} | null;
 
 export type ClienteOption = {
   id: UUID;
@@ -134,12 +151,13 @@ export type ResgateActionInput = {
 };
 
 export type ClienteUpdateInput = {
-  id: UUID;
+  id: string;
   nome: string;
-  telefone?: string;
-  email?: string;
-  cnpj?: string;
+  telefone?: string | null;
+  email?: string | null;
+  cnpj?: string | null;
   ativo?: boolean;
+  podeFazerLogin?: boolean;
 };
 
 export type CompraUpdateInput = {

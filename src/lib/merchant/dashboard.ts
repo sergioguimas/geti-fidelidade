@@ -1,4 +1,4 @@
-import { supabase } from "@/lib/supabase";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import type {
   DashboardData,
   DashboardNivelDistribuicao,
@@ -62,7 +62,15 @@ function buildTrend(current: number, previous: number) {
   };
 }
 
+function sumCompraSubtotal(compraItens: any[] | null | undefined) {
+  return (compraItens ?? []).reduce(
+    (sum, item) => sum + Number(item?.subtotal ?? 0),
+    0
+  );
+}
+
 export async function getDashboardData(
+  supabase: SupabaseClient,
   lojistaId: string,
   range: DashboardRange
 ): Promise<DashboardData> {
@@ -75,8 +83,6 @@ export async function getDashboardData(
     comprasPeriodoAnteriorResp,
     clientesNovosPeriodoResp,
     clientesNovosPeriodoAnteriorResp,
-    pontosPeriodoResp,
-    pontosPeriodoAnteriorResp,
     resgatesPeriodoResp,
     resgatesPeriodoAnteriorResp,
     clientesFidelidadeResp,
@@ -87,55 +93,59 @@ export async function getDashboardData(
     resgatesRecentesResp,
   ] = await Promise.all([
     supabase
-      .from("clientes")
-      .select("id", { count: "exact", head: true })
-      .eq("lojista_id", lojistaId),
-
-    supabase
       .from("clientes_fidelidade")
       .select("cliente_id", { count: "exact", head: true })
       .eq("lojista_id", lojistaId),
 
     supabase
-      .from("compras")
-      .select("id, valor_total, cliente_id", { count: "exact" })
+      .from("clientes_fidelidade")
+      .select("cliente_id", { count: "exact", head: true })
       .eq("lojista_id", lojistaId)
-      .eq("status", "aprovada")
+      .eq("ativo", true),
+
+    supabase
+      .from("compras")
+      .select(`
+        id,
+        cliente_id,
+        pontos_total,
+        data_compra,
+        compra_itens (
+          subtotal,
+          pontos_gerados
+        )
+      `)
+      .eq("lojista_id", lojistaId)
       .gte("data_compra", currentStart),
 
     supabase
       .from("compras")
-      .select("id, valor_total", { count: "exact" })
+      .select(`
+        id,
+        cliente_id,
+        pontos_total,
+        data_compra,
+        compra_itens (
+          subtotal,
+          pontos_gerados
+        )
+      `)
       .eq("lojista_id", lojistaId)
-      .eq("status", "aprovada")
       .gte("data_compra", previousStart)
       .lt("data_compra", previousEnd),
 
     supabase
-      .from("clientes")
-      .select("id", { count: "exact", head: true })
+      .from("clientes_fidelidade")
+      .select("cliente_id", { count: "exact", head: true })
       .eq("lojista_id", lojistaId)
-      .gte("created_at", currentStart),
+      .gte("updated_at", currentStart),
 
     supabase
-      .from("clientes")
-      .select("id", { count: "exact", head: true })
+      .from("clientes_fidelidade")
+      .select("cliente_id", { count: "exact", head: true })
       .eq("lojista_id", lojistaId)
-      .gte("created_at", previousStart)
-      .lt("created_at", previousEnd),
-
-    supabase
-      .from("lotes_pontos")
-      .select("pontos_gerados")
-      .eq("lojista_id", lojistaId)
-      .gte("created_at", currentStart),
-
-    supabase
-      .from("lotes_pontos")
-      .select("pontos_gerados")
-      .eq("lojista_id", lojistaId)
-      .gte("created_at", previousStart)
-      .lt("created_at", previousEnd),
+      .gte("updated_at", previousStart)
+      .lt("updated_at", previousEnd),
 
     supabase
       .from("resgates")
@@ -179,14 +189,15 @@ export async function getDashboardData(
       .from("compras")
       .select(`
         cliente_id,
-        valor_total,
+        compra_itens (
+          subtotal
+        ),
         clientes (
           id,
           nome
         )
       `)
       .eq("lojista_id", lojistaId)
-      .eq("status", "aprovada")
       .gte("data_compra", currentStart),
 
     supabase
@@ -221,62 +232,34 @@ export async function getDashboardData(
   ]);
 
   if (clientesResp.error) throw new Error(clientesResp.error.message);
-  if (clientesAtivosProgramaResp.error) {
-    throw new Error(clientesAtivosProgramaResp.error.message);
-  }
+  if (clientesAtivosProgramaResp.error) throw new Error(clientesAtivosProgramaResp.error.message);
   if (comprasPeriodoResp.error) throw new Error(comprasPeriodoResp.error.message);
-  if (comprasPeriodoAnteriorResp.error) {
-    throw new Error(comprasPeriodoAnteriorResp.error.message);
-  }
-  if (clientesNovosPeriodoResp.error) {
-    throw new Error(clientesNovosPeriodoResp.error.message);
-  }
-  if (clientesNovosPeriodoAnteriorResp.error) {
-    throw new Error(clientesNovosPeriodoAnteriorResp.error.message);
-  }
-  if (pontosPeriodoResp.error) throw new Error(pontosPeriodoResp.error.message);
-  if (pontosPeriodoAnteriorResp.error) {
-    throw new Error(pontosPeriodoAnteriorResp.error.message);
-  }
-  if (resgatesPeriodoResp.error) {
-    throw new Error(resgatesPeriodoResp.error.message);
-  }
-  if (resgatesPeriodoAnteriorResp.error) {
-    throw new Error(resgatesPeriodoAnteriorResp.error.message);
-  }
-  if (clientesFidelidadeResp.error) {
-    throw new Error(clientesFidelidadeResp.error.message);
-  }
-  if (resgatesPendentesResp.error) {
-    throw new Error(resgatesPendentesResp.error.message);
-  }
-  if (premiosAtivosResp.error) {
-    throw new Error(premiosAtivosResp.error.message);
-  }
-  if (topClientesComprasResp.error) {
-    throw new Error(topClientesComprasResp.error.message);
-  }
+  if (comprasPeriodoAnteriorResp.error) throw new Error(comprasPeriodoAnteriorResp.error.message);
+  if (clientesNovosPeriodoResp.error) throw new Error(clientesNovosPeriodoResp.error.message);
+  if (clientesNovosPeriodoAnteriorResp.error) throw new Error(clientesNovosPeriodoAnteriorResp.error.message);
+  if (resgatesPeriodoResp.error) throw new Error(resgatesPeriodoResp.error.message);
+  if (resgatesPeriodoAnteriorResp.error) throw new Error(resgatesPeriodoAnteriorResp.error.message);
+  if (clientesFidelidadeResp.error) throw new Error(clientesFidelidadeResp.error.message);
+  if (resgatesPendentesResp.error) throw new Error(resgatesPendentesResp.error.message);
+  if (premiosAtivosResp.error) throw new Error(premiosAtivosResp.error.message);
+  if (topClientesComprasResp.error) throw new Error(topClientesComprasResp.error.message);
   if (niveisResp.error) throw new Error(niveisResp.error.message);
-  if (resgatesRecentesResp.error) {
-    throw new Error(resgatesRecentesResp.error.message);
-  }
+  if (resgatesRecentesResp.error) throw new Error(resgatesRecentesResp.error.message);
 
   const compras = comprasPeriodoResp.data ?? [];
   const comprasPeriodoAnterior = comprasPeriodoAnteriorResp.data ?? [];
-  const pontosPeriodo = pontosPeriodoResp.data ?? [];
-  const pontosPeriodoAnterior = pontosPeriodoAnteriorResp.data ?? [];
   const clientesFidelidade = clientesFidelidadeResp.data ?? [];
   const topClientesRaw = topClientesComprasResp.data ?? [];
   const niveisRaw = niveisResp.data ?? [];
   const resgatesRecentesRaw = resgatesRecentesResp.data ?? [];
 
   const vendasPeriodo = compras.reduce(
-    (sum, item) => sum + Number(item.valor_total ?? 0),
+    (sum, item: any) => sum + sumCompraSubtotal(item.compra_itens),
     0
   );
 
   const vendasPeriodoAnterior = comprasPeriodoAnterior.reduce(
-    (sum, item) => sum + Number(item.valor_total ?? 0),
+    (sum, item: any) => sum + sumCompraSubtotal(item.compra_itens),
     0
   );
 
@@ -309,13 +292,23 @@ export async function getDashboardData(
   const clientesNovosPeriodo = clientesNovosPeriodoResp.count ?? 0;
   const clientesNovosPeriodoAnterior = clientesNovosPeriodoAnteriorResp.count ?? 0;
 
-  const pontosGeradosPeriodo = pontosPeriodo.reduce(
-    (sum, item: any) => sum + Number(item.pontos_gerados ?? 0),
+  const pontosGeradosPeriodo = compras.reduce(
+    (sum, compra: any) =>
+      sum +
+      (compra.compra_itens ?? []).reduce(
+        (inner: number, item: any) => inner + Number(item.pontos_gerados ?? 0),
+        0
+      ),
     0
   );
 
-  const pontosGeradosPeriodoAnterior = pontosPeriodoAnterior.reduce(
-    (sum, item: any) => sum + Number(item.pontos_gerados ?? 0),
+  const pontosGeradosPeriodoAnterior = comprasPeriodoAnterior.reduce(
+    (sum, compra: any) =>
+      sum +
+      (compra.compra_itens ?? []).reduce(
+        (inner: number, item: any) => inner + Number(item.pontos_gerados ?? 0),
+        0
+      ),
     0
   );
 
@@ -325,23 +318,21 @@ export async function getDashboardData(
   const topClientesMap = new Map<string, DashboardTopCliente>();
 
   for (const item of topClientesRaw as any[]) {
-    const cliente = Array.isArray(item.clientes)
-      ? item.clientes[0]
-      : item.clientes;
-
+    const cliente = Array.isArray(item.clientes) ? item.clientes[0] : item.clientes;
     if (!cliente?.id) continue;
 
+    const valorCompra = sumCompraSubtotal(item.compra_itens);
     const current = topClientesMap.get(cliente.id);
 
     if (!current) {
       topClientesMap.set(cliente.id, {
         cliente_id: cliente.id,
         nome: cliente.nome,
-        total_gasto: Number(item.valor_total ?? 0),
+        total_gasto: valorCompra,
         compras: 1,
       });
     } else {
-      current.total_gasto += Number(item.valor_total ?? 0);
+      current.total_gasto += valorCompra;
       current.compras += 1;
     }
   }
@@ -361,22 +352,17 @@ export async function getDashboardData(
     niveisMap.set(nome, (niveisMap.get(nome) ?? 0) + 1);
   }
 
-  const niveis: DashboardNivelDistribuicao[] = Array.from(
-    niveisMap.entries()
-  ).map(([nivel, quantidade]) => ({
-    nivel,
-    quantidade,
-  }));
+  const niveis: DashboardNivelDistribuicao[] = Array.from(niveisMap.entries()).map(
+    ([nivel, quantidade]) => ({
+      nivel,
+      quantidade,
+    })
+  );
 
   const solicitacoes: DashboardSolicitacao[] = (resgatesRecentesRaw as any[]).map(
     (item) => {
-      const cliente = Array.isArray(item.clientes)
-        ? item.clientes[0]
-        : item.clientes;
-
-      const premio = Array.isArray(item.premios)
-        ? item.premios[0]
-        : item.premios;
+      const cliente = Array.isArray(item.clientes) ? item.clientes[0] : item.clientes;
+      const premio = Array.isArray(item.premios) ? item.premios[0] : item.premios;
 
       return {
         id: item.id,

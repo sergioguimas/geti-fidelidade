@@ -8,8 +8,6 @@ import { PageFeedback } from "@/components/crud/page-feedback";
 import { ResgatesTable } from "@/components/lojista/resgates-table";
 import type { ResgateListItem } from "@/lib/types";
 
-const LOJISTA_ID = "9f2a1cb4-f2cc-41be-b4ae-3af0d61863c2";
-
 export default function ResgatesPage() {
   const {
     items: resgates,
@@ -19,7 +17,7 @@ export default function ResgatesPage() {
     error,
     loadItems,
   } = useCrudListPage<ResgateListItem>({
-    baseUrl: `/api/lojista/resgates?lojistaId=${LOJISTA_ID}`,
+    baseUrl: `/api/lojista/resgates`,
   });
 
   useEffect(() => {

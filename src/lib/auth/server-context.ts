@@ -8,7 +8,7 @@ export type LojistaContext = {
 };
 
 export async function requireLojistaContext(
-  request: NextRequest
+  request: NextRequest 
 ): Promise<LojistaContext> {
   const supabase = getServerSupabase(request);
 

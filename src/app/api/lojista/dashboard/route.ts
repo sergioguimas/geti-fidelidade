@@ -1,19 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
+import { requireLojistaContext } from "@/lib/auth/server-context";
 import { getDashboardData } from "@/lib/merchant/dashboard";
 import type { DashboardRange } from "@/lib/types";
 
 export async function GET(request: NextRequest) {
   try {
+    const { supabase, lojistaId } = await requireLojistaContext(request);
     const { searchParams } = new URL(request.url);
-    const lojistaId = searchParams.get("lojistaId");
     const range = (searchParams.get("range") ?? "30d") as DashboardRange;
-
-    if (!lojistaId) {
-      return NextResponse.json(
-        { error: "lojistaId é obrigatório." },
-        { status: 400 }
-      );
-    }
 
     if (!["7d", "30d", "90d"].includes(range)) {
       return NextResponse.json(
@@ -22,7 +16,7 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const data = await getDashboardData(lojistaId, range);
+    const data = await getDashboardData(supabase, lojistaId, range);
     return NextResponse.json({ data });
   } catch (error) {
     return NextResponse.json(

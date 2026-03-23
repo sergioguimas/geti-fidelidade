@@ -9,6 +9,7 @@ import {
   ChevronRight,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase/client";
+import { authFetch } from "@/lib/api";
 
 type CustomerDashboardData = {
   customer: {
@@ -215,7 +216,7 @@ export default function ClienteDashboardPage() {
         throw new Error("Usuário não autenticado.");
       }
 
-      const response = await fetch(`/api/cliente/dashboard`, {
+      const response = await authFetch(`/api/cliente/dashboard`, {
         cache: "no-store",
       });
 

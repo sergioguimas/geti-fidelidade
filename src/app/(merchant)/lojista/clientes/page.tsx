@@ -5,8 +5,7 @@ import { Search, UserPlus } from "lucide-react";
 import { ClienteForm } from "@/components/lojista/cliente-form";
 import { ClientesTable } from "@/components/lojista/clientes-table";
 import type { ClienteListItem } from "@/lib/types";
-
-const LOJISTA_ID = "9f2a1cb4-f2cc-41be-b4ae-3af0d61863c2";
+import { authFetch } from "@/lib/api";
 
 export default function ClientesPage() {
   const [clientes, setClientes] = useState<ClienteListItem[]>([]);
@@ -19,7 +18,6 @@ export default function ClientesPage() {
 
   const queryString = useMemo(() => {
     const params = new URLSearchParams({
-      lojistaId: LOJISTA_ID,
     });
 
     if (busca.trim()) {
@@ -34,7 +32,11 @@ export default function ClientesPage() {
     setError(null);
 
     try {
-      const response = await fetch(`/api/lojista/clientes?${queryString}`, {
+      const url = queryString
+        ? `/api/lojista/clientes?${queryString}`
+        : `/api/lojista/clientes`;
+
+      const response = await authFetch(url, {
         cache: "no-store",
       });
 
@@ -156,16 +158,16 @@ export default function ClientesPage() {
           </div>
 
           <ClienteForm
-            lojistaId={LOJISTA_ID}
             initialData={
               editingCliente
                 ? {
                     id: editingCliente.id,
                     nome: editingCliente.nome,
-                    telefone: editingCliente.telefone ?? "",
-                    email: editingCliente.email ?? "",
-                    cnpj: editingCliente.cnpj ?? "",
-                    ativo: editingCliente.ativo,
+                    telefone: editingCliente.telefone,
+                    email: editingCliente.email,
+                    cnpj: editingCliente.cnpj,
+                    ativo: editingCliente.fidelidade?.ativo ?? true,
+                    podeFazerLogin: editingCliente.pode_fazer_login,
                   }
                 : null
             }

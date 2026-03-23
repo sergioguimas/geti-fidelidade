@@ -1,7 +1,7 @@
-import { supabase } from "@/lib/supabase";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import type { ResgateActionInput, ResgateListItem } from "@/lib/types";
 
-export async function listResgates(lojistaId: string, busca?: string) {
+export async function listResgates(supabase: SupabaseClient, lojistaId: string, busca?: string) {
   const { data, error } = await supabase
     .from("resgates")
     .select(`
@@ -58,7 +58,7 @@ export async function listResgates(lojistaId: string, busca?: string) {
   return normalized;
 }
 
-export async function processarResgate(input: ResgateActionInput) {
+export async function processarResgate(supabase: SupabaseClient, input: ResgateActionInput) {
   const { error } = await supabase.rpc("fn_processar_status_resgate", {
     p_resgate_id: input.resgateId,
     p_novo_status: input.status,

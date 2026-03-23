@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { requireLojistaContext } from "@/lib/auth/server-context";
 import { listResgates, processarResgate } from "@/lib/merchant/resgates";
 
 export async function GET(request: NextRequest) {

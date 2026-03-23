@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { requireLojistaContext } from "@/lib/auth/server-context";
 import {
   createCliente,
   deactivateCliente,
@@ -8,19 +9,18 @@ import {
 
 export async function GET(request: NextRequest) {
   try {
+    const { supabase, lojistaId } = await requireLojistaContext(request);
     const { searchParams } = new URL(request.url);
-    const lojistaId = searchParams.get("lojistaId");
     const busca = searchParams.get("busca") ?? undefined;
 
-    if (!lojistaId) {
-      return NextResponse.json({ error: "lojistaId é obrigatório." }, { status: 400 });
-    }
-
-    const clientes = await listClientes(lojistaId, busca);
+    const clientes = await listClientes(supabase, lojistaId, busca);
     return NextResponse.json({ data: clientes });
   } catch (error) {
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Erro ao listar clientes." },
+      {
+        error:
+          error instanceof Error ? error.message : "Erro ao listar clientes.",
+      },
       { status: 500 }
     );
   }
@@ -28,20 +28,31 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
+    const { supabase, lojistaId } = await requireLojistaContext(request);
     const body = await request.json();
 
-    if (!body.lojistaId || !body.nome?.trim()) {
+    if (!body.nome?.trim()) {
       return NextResponse.json(
-        { error: "lojistaId e nome são obrigatórios." },
+        { error: "nome é obrigatório." },
         { status: 400 }
       );
     }
 
-    const cliente = await createCliente(body);
+    const cliente = await createCliente(supabase, lojistaId, {
+      nome: body.nome,
+      telefone: body.telefone ?? null,
+      email: body.email ?? null,
+      cnpj: body.cnpj ?? null,
+      ativo: body.ativo ?? true,
+      podeFazerLogin: body.podeFazerLogin ?? false,
+    });
+
     return NextResponse.json({ data: cliente }, { status: 201 });
   } catch (error) {
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Erro ao criar cliente." },
+      {
+        error: error instanceof Error ? error.message : "Erro ao criar cliente.",
+      },
       { status: 500 }
     );
   }
@@ -49,6 +60,7 @@ export async function POST(request: NextRequest) {
 
 export async function PATCH(request: NextRequest) {
   try {
+    const { supabase, lojistaId } = await requireLojistaContext(request);
     const body = await request.json();
 
     if (!body.id || !body.nome?.trim()) {
@@ -58,11 +70,23 @@ export async function PATCH(request: NextRequest) {
       );
     }
 
-    const cliente = await updateCliente(body);
+    const cliente = await updateCliente(supabase, lojistaId, {
+      id: body.id,
+      nome: body.nome,
+      telefone: body.telefone ?? null,
+      email: body.email ?? null,
+      cnpj: body.cnpj ?? null,
+      ativo: body.ativo ?? true,
+      podeFazerLogin: body.podeFazerLogin ?? false,
+    });
+
     return NextResponse.json({ data: cliente });
   } catch (error) {
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Erro ao atualizar cliente." },
+      {
+        error:
+          error instanceof Error ? error.message : "Erro ao atualizar cliente.",
+      },
       { status: 500 }
     );
   }
@@ -70,6 +94,7 @@ export async function PATCH(request: NextRequest) {
 
 export async function DELETE(request: NextRequest) {
   try {
+    const { supabase, lojistaId } = await requireLojistaContext(request);
     const { searchParams } = new URL(request.url);
     const id = searchParams.get("id");
 
@@ -77,11 +102,14 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: "id é obrigatório." }, { status: 400 });
     }
 
-    const cliente = await deactivateCliente(id);
+    const cliente = await deactivateCliente(supabase, lojistaId, id);
     return NextResponse.json({ data: cliente });
   } catch (error) {
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Erro ao desativar cliente." },
+      {
+        error:
+          error instanceof Error ? error.message : "Erro ao desativar cliente.",
+      },
       { status: 500 }
     );
   }

@@ -4,7 +4,13 @@ import { useEffect, useMemo, useState } from "react";
 import { Receipt, Search } from "lucide-react";
 import { CompraForm } from "@/components/lojista/compra-form";
 import { ComprasTable } from "@/components/lojista/compras-table";
-import type { ClienteOption, CompraListItem, ProdutoOption } from "@/lib/types";
+import { CancelCompraModal } from "@/components/lojista/compra-cancel";
+import type {
+  ClienteOption,
+  CompraCancelamentoPreview,
+  CompraListItem,
+  ProdutoOption,
+} from "@/lib/types";
 import { authFetch } from "@/lib/api";
 
 export default function ComprasPage() {
@@ -19,15 +25,22 @@ export default function ComprasPage() {
   const [editingCompra, setEditingCompra] = useState<CompraListItem | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  const [cancelModalOpen, setCancelModalOpen] = useState(false);
+  const [cancelPreviewLoading, setCancelPreviewLoading] = useState(false);
+  const [cancelActionLoading, setCancelActionLoading] = useState(false);
+  const [selectedCompra, setSelectedCompra] = useState<CompraListItem | null>(null);
+  const [cancelPreview, setCancelPreview] =
+    useState<CompraCancelamentoPreview | null>(null);
+
   const queryString = useMemo(() => {
-  const params = new URLSearchParams();
+    const params = new URLSearchParams();
 
-  if (busca.trim()) {
-    params.set("busca", busca.trim());
-  }
+    if (busca.trim()) {
+      params.set("busca", busca.trim());
+    }
 
-  return params.toString();
-}, [busca]);
+    return params.toString();
+  }, [busca]);
 
   async function loadCompras() {
     setLoading(true);
@@ -71,9 +84,12 @@ export default function ComprasPage() {
         mode: "clientes",
       });
 
-      const response = await authFetch(`/api/lojista/compras?${params.toString()}`, {
-        cache: "no-store",
-      });
+      const response = await authFetch(
+        `/api/lojista/compras?${params.toString()}`,
+        {
+          cache: "no-store",
+        }
+      );
 
       const text = await response.text();
 
@@ -81,7 +97,9 @@ export default function ComprasPage() {
       try {
         result = JSON.parse(text);
       } catch {
-        throw new Error("A API de clientes para compras não retornou JSON válido.");
+        throw new Error(
+          "A API de clientes para compras não retornou JSON válido."
+        );
       }
 
       if (!response.ok) {
@@ -150,19 +168,59 @@ export default function ComprasPage() {
     setOpenForm(false);
   }
 
-  async function handleCancelCompra(id: string) {
-    const confirmed = window.confirm(
-      "Cancelar esta compra pode alterar saldo, lotes e histórico do cliente. Deseja continuar?"
-    );
-
-    if (!confirmed) return;
-
+  async function handleRequestCancelCompra(compra: CompraListItem) {
     setError(null);
+    setSelectedCompra(compra);
+    setCancelPreview(null);
+    setCancelModalOpen(true);
+    setCancelPreviewLoading(true);
 
     try {
-      const response = await authFetch(`/api/lojista/compras?id=${id}`, {
-        method: "DELETE",
-      });
+      const response = await authFetch(
+        `/api/lojista/compras?mode=cancel-preview&id=${compra.id}`,
+        {
+          method: "GET",
+          cache: "no-store",
+        }
+      );
+
+      const text = await response.text();
+
+      let result: any;
+      try {
+        result = JSON.parse(text);
+      } catch {
+        throw new Error("A API de preview de cancelamento não retornou JSON válido.");
+      }
+
+      if (!response.ok) {
+        throw new Error(result.error || "Erro ao carregar prévia do cancelamento.");
+      }
+
+      setCancelPreview(result.data ?? null);
+    } catch (err) {
+      setCancelModalOpen(false);
+      setSelectedCompra(null);
+      setCancelPreview(null);
+      setError(err instanceof Error ? err.message : "Erro inesperado.");
+    } finally {
+      setCancelPreviewLoading(false);
+    }
+  }
+
+  async function handleConfirmCancelCompra() {
+    if (!selectedCompra) return;
+
+    setError(null);
+    setCancelActionLoading(true);
+
+    try {
+      const response = await authFetch(
+        `/api/lojista/compras?id=${selectedCompra.id}`,
+        {
+          method: "DELETE",
+        }
+      );
 
       const text = await response.text();
 
@@ -177,15 +235,29 @@ export default function ComprasPage() {
         throw new Error(result.error || "Erro ao cancelar compra.");
       }
 
-      if (editingCompra?.id === id) {
+      if (editingCompra?.id === selectedCompra.id) {
         setEditingCompra(null);
         setOpenForm(false);
       }
 
+      setCancelModalOpen(false);
+      setSelectedCompra(null);
+      setCancelPreview(null);
+
       await loadCompras();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erro inesperado.");
+    } finally {
+      setCancelActionLoading(false);
     }
+  }
+
+  function handleCloseCancelModal() {
+    if (cancelActionLoading) return;
+
+    setCancelModalOpen(false);
+    setSelectedCompra(null);
+    setCancelPreview(null);
   }
 
   return (
@@ -194,7 +266,8 @@ export default function ComprasPage() {
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Vendas</h1>
           <p className="mt-1 text-sm text-zinc-600">
-            Registre, edite e acompanhe vendas que alimentam a pontuação real dos clientes.
+            Registre, edite e acompanhe vendas que alimentam a pontuação real dos
+            clientes.
           </p>
         </div>
 
@@ -234,11 +307,12 @@ export default function ComprasPage() {
                   ? {
                       id: editingCompra.id,
                       clienteId: editingCompra.cliente_id,
-                      produtoId: editingCompra.compra_itens?.[0]?.produto_id ?? "",
-                      quantidade: editingCompra.compra_itens?.[0]?.quantidade ?? 1,
-                      valorUnitario:
-                        editingCompra.compra_itens?.[0]?.valor_unitario ?? 0,
                       dataCompra: editingCompra.data_compra,
+                      itens: editingCompra.compra_itens.map((item) => ({
+                        produtoId: item.produto_id,
+                        quantidade: item.quantidade,
+                        valorUnitario: item.valor_unitario,
+                      })),
                     }
                   : null
               }
@@ -280,10 +354,26 @@ export default function ComprasPage() {
           <ComprasTable
             compras={compras}
             onEdit={handleEditCompra}
-            onDelete={handleCancelCompra}
+            onDelete={handleRequestCancelCompra}
           />
         )}
       </section>
+
+      <CancelCompraModal
+        open={cancelModalOpen}
+        preview={cancelPreview}
+        compraLabel={
+          selectedCompra
+            ? `Cliente: ${
+                selectedCompra.cliente?.nome ?? "Cliente"
+              } • Compra em ${selectedCompra.data_compra}`
+            : undefined
+        }
+        loadingPreview={cancelPreviewLoading}
+        loadingConfirm={cancelActionLoading}
+        onClose={handleCloseCancelModal}
+        onConfirm={handleConfirmCancelCompra}
+      />
     </div>
   );
 }

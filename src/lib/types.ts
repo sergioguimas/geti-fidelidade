@@ -150,6 +150,17 @@ export type CompraUpdateInput = {
   itens: CompraItemInput[];
 };
 
+export type CompraCancelamentoPreview = {
+  compraId: string;
+  statusCompra: string | null;
+  pontosGerados: number;
+  pontosDisponiveisNoLote: number;
+  pontosJaUsados: number;
+  saldoDisponivelEmOutrosLotes: number;
+  saldoNegativoResultante: number;
+  precisaConfirmacaoEspecial: boolean;
+};
+
 export type PremioListItem = {
   id: UUID;
   lojista_id: UUID;

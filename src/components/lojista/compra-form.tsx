@@ -5,13 +5,17 @@ import { Plus, Search, Trash2, X } from "lucide-react";
 import type { ClienteOption, ProdutoOption } from "@/lib/types";
 import { authFetch } from "@/lib/api";
 
+export type CompraFormInitialItem = {
+  produtoId: string;
+  quantidade: number;
+  valorUnitario: number;
+};
+
 export type CompraFormInitialData = {
   id: string;
   clienteId: string;
-  produtoId?: string;
-  quantidade?: number;
-  valorUnitario?: number;
   dataCompra: string;
+  itens: CompraFormInitialItem[];
 } | null;
 
 type CompraFormProps = {
@@ -47,6 +51,7 @@ function createEmptyItem(): ItemForm {
 
 function getProdutoPreco(produto: ProdutoOption | undefined) {
   if (!produto) return "";
+
   const possibleValue =
     (produto as any).valor ??
     (produto as any).preco ??
@@ -224,10 +229,6 @@ export function CompraForm({
   const [clienteId, setClienteId] = useState("");
   const [dataCompra, setDataCompra] = useState("");
   const [itens, setItens] = useState<ItemForm[]>([createEmptyItem()]);
-  const [status, setStatus] = useState<
-    "pendente" | "aprovada" | "recusada" | "cancelada"
-  >("aprovada");
-
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -241,21 +242,21 @@ export function CompraForm({
         : new Date().toISOString().slice(0, 10)
     );
 
-    if (initialData?.produtoId) {
-      setItens([
-        {
+    if (initialData?.itens?.length) {
+      setItens(
+        initialData.itens.map((item) => ({
           id: crypto.randomUUID(),
-          produtoId: initialData.produtoId ?? "",
+          produtoId: item.produtoId ?? "",
           quantidade:
-            initialData?.quantidade != null
-              ? String(initialData.quantidade)
+            item.quantidade != null && Number.isFinite(item.quantidade)
+              ? String(item.quantidade)
               : "1",
           valorUnitario:
-            initialData?.valorUnitario != null
-              ? String(initialData.valorUnitario)
+            item.valorUnitario != null && Number.isFinite(item.valorUnitario)
+              ? String(item.valorUnitario)
               : "",
-        },
-      ]);
+        }))
+      );
     } else {
       setItens([createEmptyItem()]);
     }
@@ -361,14 +362,14 @@ export function CompraForm({
             id: initialData?.id,
             clienteId,
             dataCompra,
-            origem: "lojista",
+            origem: "manual",
             status: "aprovada",
             itens: normalizedItens,
           }
         : {
             clienteId,
             dataCompra,
-            origem: "lojista",
+            origem: "manual",
             status: "aprovada",
             itens: normalizedItens,
           };
@@ -400,7 +401,6 @@ export function CompraForm({
       setClienteId("");
       setItens([createEmptyItem()]);
       setDataCompra(new Date().toISOString().slice(0, 10));
-      setStatus("aprovada");
 
       await onCreated();
     } catch (err) {

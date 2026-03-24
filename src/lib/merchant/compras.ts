@@ -3,6 +3,7 @@ import type {
   CompraCreateInput,
   CompraUpdateInput,
   CompraItemInput,
+  CompraCancelamentoPreview,
 } from "../types";
 
 function round2(value: number) {
@@ -306,18 +307,77 @@ export async function updateCompra(
   return compra;
 }
 
-export async function removeCompra(
+export async function previewCancelCompra(
+  supabase: SupabaseClient,
+  lojistaId: string,
+  id: string
+): Promise<CompraCancelamentoPreview> {
+  const { data: compra, error: compraError } = await supabase
+    .from("compras")
+    .select("id, lojista_id")
+    .eq("id", id)
+    .eq("lojista_id", lojistaId)
+    .single();
+
+  if (compraError || !compra) {
+    throw new Error(compraError?.message ?? "Compra não encontrada.");
+  }
+
+  const { data, error } = await supabase.rpc(
+    "fn_prever_cancelamento_compra",
+    { p_compra_id: id }
+  );
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  const result = data as Record<string, unknown> | null;
+
+  if (!result) {
+    throw new Error("Não foi possível prever o cancelamento da compra.");
+  }
+
+  return {
+    compraId: String(result.compraId ?? id),
+    statusCompra: result.statusCompra ? String(result.statusCompra) : null,
+    pontosGerados: Number(result.pontosGerados ?? 0),
+    pontosDisponiveisNoLote: Number(result.pontosDisponiveisNoLote ?? 0),
+    pontosJaUsados: Number(result.pontosJaUsados ?? 0),
+    saldoDisponivelEmOutrosLotes: Number(
+      result.saldoDisponivelEmOutrosLotes ?? 0
+    ),
+    saldoNegativoResultante: Number(result.saldoNegativoResultante ?? 0),
+    precisaConfirmacaoEspecial: Boolean(
+      result.precisaConfirmacaoEspecial ?? false
+    ),
+  };
+}
+
+export async function cancelCompra(
   supabase: SupabaseClient,
   lojistaId: string,
   id: string
 ) {
-  const { error } = await supabase
+  const { data: compra, error: compraError } = await supabase
     .from("compras")
-    .delete()
+    .select("id, lojista_id, status")
     .eq("id", id)
-    .eq("lojista_id", lojistaId);
+    .eq("lojista_id", lojistaId)
+    .single();
 
-  if (error) throw new Error(error.message);
+  if (compraError || !compra) {
+    throw new Error(compraError?.message ?? "Compra não encontrada.");
+  }
+
+  const { error } = await supabase.rpc(
+    "fn_cancelar_compra_com_compensacao",
+    { p_compra_id: id }
+  );
+
+  if (error) {
+    throw new Error(error.message);
+  }
 
   return { success: true };
 }

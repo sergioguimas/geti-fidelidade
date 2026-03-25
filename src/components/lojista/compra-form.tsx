@@ -362,14 +362,14 @@ export function CompraForm({
             id: initialData?.id,
             clienteId,
             dataCompra,
-            origem: "manual",
+            origem: "lojista",
             status: "aprovada",
             itens: normalizedItens,
           }
         : {
             clienteId,
             dataCompra,
-            origem: "manual",
+            origem: "lojista",
             status: "aprovada",
             itens: normalizedItens,
           };
@@ -418,9 +418,6 @@ export function CompraForm({
             <h3 className="text-base font-semibold text-zinc-900">
               {isEditing ? "Editar venda" : "Novo lançamento"}
             </h3>
-            <p className="mt-1 text-sm text-zinc-500">
-              Monte a compra como um mini-caixa, adicionando os itens abaixo.
-            </p>
           </div>
 
           <div className="min-w-[160px] rounded-2xl bg-zinc-950 px-4 py-3 text-white">

@@ -132,17 +132,28 @@ export async function listCompras(
   if (error) throw new Error(error.message);
 
   let rows = (data ?? []).map((item: any) => {
-  const lotes = (item.lotes_pontos ?? []).map((lp: any) => ({
-    ...lp,
-    percentual_aplicado: Number(lp.percentual_aplicado ?? 0),
-    teto_aplicado: Number(lp.teto_aplicado ?? 0),
-    pontos_gerados: Number(lp.pontos_gerados ?? 0),
-    pontos_disponiveis: Number(lp.pontos_disponiveis ?? 0),
-    pontos_pendentes: Number(lp.pontos_pendentes ?? 0),
-    pontos_gastos: Number(lp.pontos_gastos ?? 0),
-    pontos_expirados: Number(lp.pontos_expirados ?? 0),
-    pontos_cancelados: Number(lp.pontos_cancelados ?? 0),
-  }));
+  const lotes = (item.lotes_pontos ?? [])
+    .map((lp: any) => ({
+      ...lp,
+      percentual_aplicado: Number(lp.percentual_aplicado ?? 0),
+      teto_aplicado: Number(lp.teto_aplicado ?? 0),
+      pontos_gerados: Number(lp.pontos_gerados ?? 0),
+      pontos_disponiveis: Number(lp.pontos_disponiveis ?? 0),
+      pontos_pendentes: Number(lp.pontos_pendentes ?? 0),
+      pontos_gastos: Number(lp.pontos_gastos ?? 0),
+      pontos_expirados: Number(lp.pontos_expirados ?? 0),
+      pontos_cancelados: Number(lp.pontos_cancelados ?? 0),
+    }))
+    .sort((a: any, b: any) => {
+      const aTime = new Date(a.created_at ?? 0).getTime();
+      const bTime = new Date(b.created_at ?? 0).getTime();
+      return bTime - aTime;
+    });
+
+  const loteAtual =
+    lotes.find((lp: any) => lp.status === "disponivel" || lp.status === "pendente") ??
+    lotes[0] ??
+    null;
 
   const cliente = Array.isArray(item.clientes)
     ? item.clientes[0] ?? null
@@ -169,7 +180,7 @@ export async function listCompras(
       pontos_gerados: Number(ci.pontos_gerados),
     })),
     lotes_pontos: lotes,
-    lote: lotes[0] ?? null,
+    lote: loteAtual,
   };
 });
 
@@ -204,23 +215,20 @@ export async function createCompra(
     compraItens.reduce((sum, item) => sum + item.subtotal, 0)
   );
 
-  const pontosTotal = round2(
-    compraItens.reduce((sum, item) => sum + item.pontos_gerados, 0)
-  );
-  
-
   const { data: compra, error: compraError } = await supabase
     .from("compras")
     .insert({
       lojista_id: lojistaId,
       cliente_id: input.clienteId,
-      pontos_total: pontosTotal,
+      pontos_total: 0,
       valor_total: valorTotal,
       origem: input.origem ?? "lojista",
       status: input.status ?? "aprovada",
       data_compra: input.dataCompra,
     })
-    .select("id, lojista_id, cliente_id, valor_total, pontos_total, status, origem, data_compra, created_at, updated_at")
+    .select(
+      "id, lojista_id, cliente_id, valor_total, pontos_total, status, origem, data_compra, created_at, updated_at"
+    )
     .single();
 
   if (compraError || !compra) {
@@ -241,7 +249,32 @@ export async function createCompra(
     throw new Error(itensError.message);
   }
 
-  return compra;
+  const { error: processarError } = await supabase.rpc("fn_processar_compra", {
+    p_compra_id: compra.id,
+  });
+
+  if (processarError) {
+    await supabase.from("compra_itens").delete().eq("compra_id", compra.id);
+    await supabase.from("compras").delete().eq("id", compra.id);
+    throw new Error(processarError.message);
+  }
+
+  const { data: compraProcessada, error: compraProcessadaError } = await supabase
+    .from("compras")
+    .select(
+      "id, lojista_id, cliente_id, valor_total, pontos_total, status, origem, data_compra, created_at, updated_at"
+    )
+    .eq("id", compra.id)
+    .single();
+
+  if (compraProcessadaError || !compraProcessada) {
+    throw new Error(
+      compraProcessadaError?.message ??
+        "Compra criada, mas não foi possível recarregar o resultado final."
+    );
+  }
+
+  return compraProcessada;
 }
 
 export async function updateCompra(
@@ -265,46 +298,75 @@ export async function updateCompra(
     compraItens.reduce((sum, item) => sum + item.subtotal, 0)
   );
 
-  const pontosTotal = round2(
-    compraItens.reduce((sum, item) => sum + item.pontos_gerados, 0)
-  );
-
   const { data: compra, error: compraError } = await supabase
     .from("compras")
     .update({
       cliente_id: input.clienteId,
-      pontos_total: pontosTotal,
       valor_total: valorTotal,
+      pontos_total: 0,
       origem: input.origem ?? "lojista",
       status: input.status ?? "aprovada",
       data_compra: input.dataCompra,
+      updated_at: new Date().toISOString(),
     })
     .eq("id", input.id)
-    .eq("lojista_id", input.lojistaId)
-    .select("id, lojista_id, cliente_id, valor_total, pontos_total, status, origem, data_compra, created_at, updated_at")
+    .eq("lojista_id", lojistaId)
+    .select(
+      "id, lojista_id, cliente_id, valor_total, pontos_total, status, origem, data_compra, created_at, updated_at"
+    )
     .single();
 
   if (compraError || !compra) {
     throw new Error(compraError?.message ?? "Erro ao atualizar compra.");
   }
 
-  const { error: deleteError } = await supabase
+  const { error: deleteItensError } = await supabase
     .from("compra_itens")
     .delete()
     .eq("compra_id", input.id);
 
-  if (deleteError) throw new Error(deleteError.message);
+  if (deleteItensError) {
+    throw new Error(deleteItensError.message);
+  }
 
-  const { error: itensError } = await supabase.from("compra_itens").insert(
-    compraItens.map((item) => ({
-      compra_id: input.id,
-      ...item,
-    }))
-  );
+  const itensPayload = compraItens.map((item) => ({
+    compra_id: input.id,
+    ...item,
+  }));
 
-  if (itensError) throw new Error(itensError.message);
+  const { error: itensError } = await supabase
+    .from("compra_itens")
+    .insert(itensPayload);
 
-  return compra;
+  if (itensError) {
+    throw new Error(itensError.message);
+  }
+
+  const { error: processarError } = await supabase.rpc("fn_processar_compra", {
+    p_compra_id: input.id,
+  });
+
+  if (processarError) {
+    throw new Error(processarError.message);
+  }
+
+  const { data: compraProcessada, error: compraProcessadaError } =
+    await supabase
+      .from("compras")
+      .select(
+        "id, lojista_id, cliente_id, valor_total, pontos_total, status, origem, data_compra, created_at, updated_at"
+      )
+      .eq("id", input.id)
+      .single();
+
+  if (compraProcessadaError || !compraProcessada) {
+    throw new Error(
+      compraProcessadaError?.message ??
+        "Compra atualizada, mas erro ao recarregar dados."
+    );
+  }
+
+  return compraProcessada;
 }
 
 export async function previewCancelCompra(

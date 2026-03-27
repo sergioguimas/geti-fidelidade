@@ -23,7 +23,10 @@ export async function middleware(req: NextRequest) {
           res.cookies.set(name, value, options);
         },
         remove(name, options) {
-          res.cookies.set(name, "", options);
+          res.cookies.set(name, "", {
+            ...options,
+            maxAge: 0,
+          });
         },
       },
     }
@@ -104,10 +107,21 @@ export async function middleware(req: NextRequest) {
     return NextResponse.redirect(new URL("/login?unauthorized=1", req.url));
   }
 
-  if (isRootPage || isAuthPage) {
+  const unauthorized = req.nextUrl.searchParams.get("unauthorized");
+  const blocked = req.nextUrl.searchParams.get("blocked");
+
+  if (isRootPage) {
     return NextResponse.redirect(new URL(defaultRedirect, req.url));
   }
 
+  if (isAuthPage) {
+    if (unauthorized === "1" || blocked === "1") {
+      return res;
+    }
+
+    return NextResponse.redirect(new URL(defaultRedirect, req.url));
+  }
+  
   if (isAdminRoute && !isAdmin) {
     return NextResponse.redirect(new URL(defaultRedirect, req.url));
   }

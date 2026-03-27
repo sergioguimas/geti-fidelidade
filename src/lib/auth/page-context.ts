@@ -26,8 +26,12 @@ export async function requireLojistaPageContext() {
     .eq("auth_user_id", user.id)
     .maybeSingle();
 
-  if (vinculoError || !vinculo?.lojista_id) {
-    redirect("/login");
+  if (vinculoError) {
+    redirect("/login?unauthorized=1");
+  }
+
+  if (!vinculo?.lojista_id) {
+    redirect("/login?unauthorized=1");
   }
 
   const lojista = Array.isArray(vinculo.lojistas)

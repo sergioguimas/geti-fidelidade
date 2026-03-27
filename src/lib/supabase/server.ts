@@ -1,4 +1,5 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import type { NextRequest } from "next/server";
 
@@ -9,21 +10,7 @@ function extractAccessTokenFromRequest(request: NextRequest) {
     return authHeader.slice(7);
   }
 
-  return (
-    request.cookies.get("sb-access-token")?.value ??
-    request.cookies.get("sb-access-token.0")?.value ??
-    null
-  );
-}
-
-async function extractAccessTokenFromCookies() {
-  const cookieStore = await cookies();
-
-  return (
-    cookieStore.get("sb-access-token")?.value ??
-    cookieStore.get("sb-access-token.0")?.value ??
-    null
-  );
+  return null;
 }
 
 function createServerSupabaseWithToken(accessToken: string | null): SupabaseClient {
@@ -56,7 +43,20 @@ export function getServerSupabase(request: NextRequest): SupabaseClient {
 /**
  * Para pages/layouts/server components do App Router
  */
-export async function getPageSupabase(): Promise<SupabaseClient> {
-  const accessToken = await extractAccessTokenFromCookies();
-  return createServerSupabaseWithToken(accessToken);
+export async function getPageSupabase() {
+  const cookieStore = await cookies();
+
+  return createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        get(name: string) {
+          return cookieStore.get(name)?.value;
+        },
+        set() {},
+        remove() {},
+      },
+    }
+  );
 }

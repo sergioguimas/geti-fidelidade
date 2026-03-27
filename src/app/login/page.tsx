@@ -95,16 +95,62 @@ export default function LoginPage() {
         return;
       }
 
-      const { data: admin } = await supabase
-        .from("admins_plataforma")
-        .select("id")
-        .eq("auth_user_id", authData.user.id)
-        .eq("ativo", true)
-        .maybeSingle();
+      const userId = authData.user.id;
 
-      window.location.replace(admin ? "/admin" : "/lojista");
-      return;
-    } catch {
+      const [
+        { data: admin, error: adminError },
+        { data: vinculoLojista, error: lojistaError },
+      ] = await Promise.all([
+        supabase
+          .from("admins_plataforma")
+          .select("id, auth_user_id, ativo")
+          .eq("auth_user_id", userId)
+          .eq("ativo", true)
+          .maybeSingle(),
+
+        supabase
+          .from("lojistas_usuarios")
+          .select("id, lojista_id")
+          .eq("auth_user_id", userId)
+          .maybeSingle(),
+      ]);
+
+      console.log("login merchant debug", {
+        userId,
+        admin,
+        adminError,
+        vinculoLojista,
+        lojistaError,
+      });
+
+      if (adminError) {
+        await supabase.auth.signOut();
+        setError(`Falha ao validar admin: ${adminError.message}`);
+        return;
+      }
+
+      if (admin) {
+        router.push("/admin");
+        router.refresh();
+        return;
+      }
+
+      if (lojistaError) {
+        await supabase.auth.signOut();
+        setError(`Falha ao validar lojista: ${lojistaError.message}`);
+        return;
+      }
+
+      if (vinculoLojista) {
+        router.push("/lojista");
+        router.refresh();
+        return;
+      }
+
+      await supabase.auth.signOut();
+      setError("Usuário autenticado, mas sem perfil autorizado.");
+    } catch (err) {
+      console.error("handleMerchantLogin error", err);
       setError("Não foi possível entrar agora.");
     } finally {
       setLoading(false);
@@ -176,7 +222,8 @@ export default function LoginPage() {
         .update({ ultimo_login_em: new Date().toISOString() })
         .eq("id", cliente.id);
 
-      window.location.replace("/cliente");
+        router.push("/cliente");
+        router.refresh();
       return;
     } catch {
       setError("Não foi possível entrar agora.");

@@ -97,6 +97,7 @@ export function ImportacaoProdutosPage() {
         headers: {
           "Content-Type": "application/json",
         },
+        credentials: "include",
         body: JSON.stringify({ csv: csvContent }),
       });
 
@@ -177,6 +178,7 @@ export function ImportacaoProdutosPage() {
         headers: {
           "Content-Type": "application/json",
         },
+        credentials: "include",
         body: JSON.stringify({ items }),
       });
 
@@ -289,6 +291,8 @@ export function ImportacaoProdutosPage() {
         </div>
       ) : null}
 
+      {preview? (<hr></hr>) : null}
+
       {preview ? (
         <ImportacaoProdutosPreview
           preview={preview}
@@ -301,15 +305,17 @@ export function ImportacaoProdutosPage() {
         />
       ) : null}
 
+      {confirmResult? (<hr></hr>) : null}
+
       {confirmResult ? (
-        <section className="rounded-2xl border border-zinc-800 bg-zinc-900/60 p-5">
+        <section className="rounded-2xl p-5 glass-card">
           <div className="flex items-start gap-3">
             <CheckCircle2 className="mt-0.5 h-5 w-5 text-emerald-400" />
             <div>
-              <h2 className="text-base font-semibold text-white">Resultado da importação</h2>
-              <p className="mt-1 text-sm text-zinc-400">
-                Processados: {confirmResult.resumo.processados} · Sucesso:{" "}
-                {confirmResult.resumo.sucesso} · Falhas: {confirmResult.resumo.falhas}
+              <h2 className="text-base font-semibold text-zinc">Resultado da importação</h2>
+              <p className="mt-1 text-sm text-zinc-600">
+                Processados: {confirmResult.resumo.processados} - Sucesso:{" "}
+                {confirmResult.resumo.sucesso} / Falhas: {confirmResult.resumo.falhas}
               </p>
             </div>
           </div>

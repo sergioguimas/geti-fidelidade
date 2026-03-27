@@ -74,9 +74,9 @@ export function ImportacaoProdutosPreview({
   totalSelecionadosParaAtualizar,
 }: Props) {
   return (
-    <div className="space-y-4">
-      <section className="rounded-2xl border border-zinc-800 bg-zinc-900/60 p-5">
-        <h2 className="text-base font-semibold text-white">Resumo da análise</h2>
+    <div className="space-y-4 ">
+      <section className="rounded-2xl border border-zinc-800 bg-zinc-900/60 p-5 glass-card">
+        <h2 className="text-base font-semibold text-black">Resumo da análise</h2>
 
         <div className="mt-4 grid gap-4 md:grid-cols-4">
           <div className="rounded-2xl border border-zinc-800 bg-zinc-950 p-4">
@@ -84,20 +84,20 @@ export function ImportacaoProdutosPreview({
             <p className="mt-2 text-2xl font-semibold text-white">{preview.resumo.totalLinhas}</p>
           </div>
 
-          <div className="rounded-2xl border border-emerald-900/40 bg-emerald-950/20 p-4">
-            <p className="text-xs uppercase tracking-wide text-emerald-400/70">Novos</p>
+          <div className="rounded-2xl border border-emerald-900/40 bg-emerald-950/80 p-4">
+            <p className="text-xs uppercase tracking-wide text-emerald-400">Novos</p>
             <p className="mt-2 text-2xl font-semibold text-emerald-300">{preview.resumo.novos}</p>
           </div>
 
-          <div className="rounded-2xl border border-amber-900/40 bg-amber-950/20 p-4">
-            <p className="text-xs uppercase tracking-wide text-amber-400/70">Duplicados</p>
+          <div className="rounded-2xl border border-amber-900/40 bg-amber-950/80 p-4">
+            <p className="text-xs uppercase tracking-wide text-amber-400">Duplicados</p>
             <p className="mt-2 text-2xl font-semibold text-amber-300">
               {preview.resumo.duplicados}
             </p>
           </div>
 
-          <div className="rounded-2xl border border-red-900/40 bg-red-950/20 p-4">
-            <p className="text-xs uppercase tracking-wide text-red-400/70">Inválidos</p>
+          <div className="rounded-2xl border border-red-900/40 bg-red-950/80 p-4">
+            <p className="text-xs uppercase tracking-wide text-red-400">Inválidos</p>
             <p className="mt-2 text-2xl font-semibold text-red-300">
               {preview.resumo.invalidos}
             </p>
@@ -106,16 +106,16 @@ export function ImportacaoProdutosPreview({
       </section>
 
       {preview.novos.length ? (
-        <section className="rounded-2xl border border-zinc-800 bg-zinc-900/60 p-5">
+        <section className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm">
           <div className="flex items-center gap-3">
             <PlusCircle className="h-5 w-5 text-emerald-400" />
-            <h2 className="text-base font-semibold text-white">Produtos novos</h2>
+            <h2 className="text-base font-semibold text-zinc">Produtos novos</h2>
           </div>
 
           <div className="mt-4 overflow-x-auto">
             <table className="w-full min-w-[640px] text-sm">
               <thead>
-                <tr className="border-b border-zinc-800 text-left text-zinc-400">
+                <tr className="border-b border-zinc-800 text-left text-black">
                   <th className="px-3 py-3 font-medium">Linha</th>
                   <th className="px-3 py-3 font-medium">Descrição</th>
                   <th className="px-3 py-3 font-medium">Teto %</th>
@@ -124,10 +124,10 @@ export function ImportacaoProdutosPreview({
               </thead>
               <tbody>
                 {preview.novos.map((item) => (
-                  <tr key={`novo-${item.linha}`} className="border-b border-zinc-800/70">
-                    <td className="px-3 py-3 text-zinc-400">{item.linha}</td>
-                    <td className="px-3 py-3 text-zinc-100">{item.descricao}</td>
-                    <td className="px-3 py-3 text-zinc-200">{item.tetoPercentual}</td>
+                  <tr key={`novo-${item.linha}`} className="border-b border-zinc-800">
+                    <td className="px-3 py-3 text-zinc-800">{item.linha}</td>
+                    <td className="px-3 py-3 text-zinc-800">{item.descricao}</td>
+                    <td className="px-3 py-3 text-zinc-800">{item.tetoPercentual}</td>
                     <td className="px-3 py-3">
                       <BoolBadge value={item.ativo} />
                     </td>
@@ -140,13 +140,13 @@ export function ImportacaoProdutosPreview({
       ) : null}
 
       {preview.duplicados.length ? (
-        <section className="rounded-2xl border border-zinc-800 bg-zinc-900/60 p-5">
+        <section className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex items-center gap-3">
               <RefreshCcw className="h-5 w-5 text-amber-400" />
               <div>
-                <h2 className="text-base font-semibold text-white">Produtos duplicados</h2>
-                <p className="mt-1 text-sm text-zinc-400">
+                <h2 className="text-base font-semibold text-zinc">Produtos duplicados</h2>
+                <p className="mt-1 text-sm text-zinc-600">
                   Marque os itens que devem atualizar o cadastro existente.
                 </p>
               </div>
@@ -173,7 +173,7 @@ export function ImportacaoProdutosPreview({
           <div className="mt-4 overflow-x-auto">
             <table className="w-full min-w-[980px] text-sm">
               <thead>
-                <tr className="border-b border-zinc-800 text-left text-zinc-400">
+                <tr className="border-b border-zinc-800 text-left text-zinc-800">
                   <th className="px-3 py-3 font-medium">Atualizar</th>
                   <th className="px-3 py-3 font-medium">Linha</th>
                   <th className="px-3 py-3 font-medium">Descrição CSV</th>
@@ -198,14 +198,14 @@ export function ImportacaoProdutosPreview({
                           className="h-4 w-4 rounded border-zinc-700 bg-zinc-950 text-white"
                         />
                       </td>
-                      <td className="px-3 py-3 text-zinc-400">{item.linha}</td>
-                      <td className="px-3 py-3 text-zinc-100">{item.descricao}</td>
-                      <td className="px-3 py-3 text-zinc-200">{item.tetoPercentual}</td>
+                      <td className="px-3 py-3 text-zinc-800">{item.linha}</td>
+                      <td className="px-3 py-3 text-zinc-800">{item.descricao}</td>
+                      <td className="px-3 py-3 text-zinc-800">{item.tetoPercentual}</td>
                       <td className="px-3 py-3">
                         <BoolBadge value={item.ativo} />
                       </td>
-                      <td className="px-3 py-3 text-zinc-100">{item.existente.descricao}</td>
-                      <td className="px-3 py-3 text-zinc-300">{item.existente.tetoPercentual}</td>
+                      <td className="px-3 py-3 text-zinc-800">{item.existente.descricao}</td>
+                      <td className="px-3 py-3 text-zinc-800">{item.existente.tetoPercentual}</td>
                       <td className="px-3 py-3">
                         <BoolBadge value={item.existente.ativo} />
                       </td>
@@ -219,10 +219,10 @@ export function ImportacaoProdutosPreview({
       ) : null}
 
       {preview.invalidos.length ? (
-        <section className="rounded-2xl border border-zinc-800 bg-zinc-900/60 p-5">
+        <section className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm">
           <div className="flex items-center gap-3">
             <AlertTriangle className="h-5 w-5 text-red-400" />
-            <h2 className="text-base font-semibold text-white">Linhas inválidas</h2>
+            <h2 className="text-base font-semibold text-zinc">Linhas inválidas</h2>
           </div>
 
           <div className="mt-4 space-y-2">
@@ -239,14 +239,14 @@ export function ImportacaoProdutosPreview({
         </section>
       ) : null}
 
-      <section className="rounded-2xl border border-zinc-800 bg-zinc-900/60 p-5">
+      <section className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm">
         <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <div>
-            <h2 className="text-base font-semibold text-white">Confirmar importação</h2>
-            <p className="mt-1 text-sm text-zinc-400">
-              Serão criados <span className="font-medium text-zinc-200">{preview.novos.length}</span>{" "}
+            <h2 className="text-base font-semibold text-zinc">Confirmar importação</h2>
+            <p className="mt-1 text-sm text-zinc-600">
+              Serão criados <span className="font-medium text-zinc-800">{preview.novos.length}</span>{" "}
               produtos novos e atualizados{" "}
-              <span className="font-medium text-zinc-200">{totalSelecionadosParaAtualizar}</span>{" "}
+              <span className="font-medium text-zinc-800">{totalSelecionadosParaAtualizar}</span>{" "}
               duplicados selecionados.
             </p>
           </div>
@@ -255,7 +255,7 @@ export function ImportacaoProdutosPreview({
             type="button"
             onClick={onConfirm}
             disabled={loadingConfirm}
-            className="inline-flex items-center justify-center gap-2 rounded-xl bg-white px-4 py-2 text-sm font-semibold text-zinc-900 transition hover:bg-zinc-200 disabled:cursor-not-allowed disabled:opacity-60"
+            className="inline-flex items-center justify-center gap-2 rounded-xl bg-zinc-200 px-4 py-2 text-sm font-semibold text-zinc-900 transition hover:bg-zinc-800 hover:text-white disabled:cursor-not-allowed disabled:opacity-60"
           >
             {loadingConfirm ? (
               <Loader2 className="h-4 w-4 animate-spin" />

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Box, Plus, Search } from "lucide-react";
+import { Box, Plus, Search, Import, Link } from "lucide-react";
 import { authFetch } from "@/lib/api";
 import type { ProdutoFormInitialData, ProdutoListItem } from "@/lib/types";
 import { ProdutoForm } from "@/components/lojista/produto-form";
@@ -127,17 +127,38 @@ export default function ProdutosPage() {
             </p>
           </div>
 
-          <button
-            type="button"
-            onClick={handleNewProduto}
-            className="inline-flex items-center justify-center gap-2 rounded-xl bg-zinc-900 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-zinc-800"
-          >
-            <Plus className="h-4 w-4" />
-            {openForm && !editingProduto ? "Fechar formulário" : "Novo produto"}
-          </button>
+          <div className="flex flex-col gap-2">
+            <button
+              type="button"
+              onClick={handleNewProduto}
+              className="inline-flex items-center justify-center gap-2 rounded-xl bg-zinc-900 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-zinc-800"
+            >
+              <Plus className="h-4 w-4" />
+              {openForm && !editingProduto ? "Fechar formulário" : "Novo produto"}
+            </button>
+            <a href="/lojista/configuracoes/importacao">
+              <div
+                className="inline-flex items-center justify-center gap-2 rounded-xl bg-zinc-900 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-zinc-800">
+                <Import className="h-4 2-4"/>
+                Importar Planilha
+              </div>
+            </a>
+          </div>
         </div>
       </section>
 
+      {openForm ? (
+        <ProdutoForm
+          initialData={initialData}
+          onCancel={handleCancelForm}
+          onCreated={async () => {
+            setEditingProduto(null);
+            setOpenForm(false);
+            await loadProdutos();
+          }}
+        />
+      ) : null}
+      
       <section className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm">
         <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
           <div className="w-full max-w-md">
@@ -158,17 +179,6 @@ export default function ProdutosPage() {
         </div>
       </section>
 
-      {openForm ? (
-        <ProdutoForm
-          initialData={initialData}
-          onCancel={handleCancelForm}
-          onCreated={async () => {
-            setEditingProduto(null);
-            setOpenForm(false);
-            await loadProdutos();
-          }}
-        />
-      ) : null}
 
       {error ? (
         <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">

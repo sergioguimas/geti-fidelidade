@@ -1,10 +1,36 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireLojistaContext } from "@/lib/auth/server-context";
+import { createRouteClient } from "@/lib/supabase/route";
 import { gerarPreviewImportacaoProdutos } from "@/lib/merchant/produtos-importacao";
 
 export async function POST(request: NextRequest) {
   try {
-    const { supabase, lojistaId } = await requireLojistaContext(request);
+    const supabase = await createRouteClient();
+
+    const {
+      data: { user },
+      error: userError,
+    } = await supabase.auth.getUser();
+
+    if (userError || !user) {
+      return NextResponse.json(
+        { error: "Usuário não autenticado." },
+        { status: 401 }
+      );
+    }
+
+    const { data: vinculo, error: vinculoError } = await supabase
+      .from("lojistas_usuarios")
+      .select("lojista_id")
+      .eq("auth_user_id", user.id)
+      .maybeSingle();
+
+    if (vinculoError || !vinculo?.lojista_id) {
+      return NextResponse.json(
+        { error: "Lojista não encontrado." },
+        { status: 403 }
+      );
+    }
+
     const body = await request.json();
 
     if (!body.csv?.trim()) {
@@ -16,7 +42,7 @@ export async function POST(request: NextRequest) {
 
     const preview = await gerarPreviewImportacaoProdutos(
       supabase,
-      lojistaId,
+      vinculo.lojista_id,
       body.csv
     );
 

@@ -11,8 +11,6 @@ import { CustomerLoginForm } from "@/components/auth/customer-login-form";
 import { RecoverPasswordPanel } from "@/components/auth/recover-password-panel";
 import { TermsPanel } from "@/components/auth/terms-panel";
 
-import { formatCnpj } from "@/lib/formatters/cnpj";
-
 type AuthTab = "merchant" | "customer";
 type ViewMode = "login" | "recover" | "terms";
 
@@ -21,7 +19,27 @@ type ClienteLoginRow = {
   email: string | null;
   auth_user_id: string | null;
   pode_fazer_login: boolean;
+  documento: string | null;
 };
+
+function formatDocumento(value: string) {
+  const digits = value.replace(/\D/g, "");
+
+  if (digits.length <= 11) {
+    return digits
+      .replace(/^(\d{3})(\d)/, "$1.$2")
+      .replace(/^(\d{3})\.(\d{3})(\d)/, "$1.$2.$3")
+      .replace(/\.(\d{3})(\d)/, ".$1-$2")
+      .slice(0, 14);
+  }
+
+  return digits
+    .replace(/^(\d{2})(\d)/, "$1.$2")
+    .replace(/^(\d{2})\.(\d{3})(\d)/, "$1.$2.$3")
+    .replace(/\.(\d{3})(\d)/, ".$1/$2")
+    .replace(/(\d{4})(\d)/, "$1-$2")
+    .slice(0, 18);
+}
 
 export default function LoginPage() {
   const router = useRouter();
@@ -32,7 +50,7 @@ export default function LoginPage() {
   const [merchantEmail, setMerchantEmail] = useState("");
   const [merchantPassword, setMerchantPassword] = useState("");
 
-  const [customerCnpj, setCustomerCnpj] = useState("");
+  const [customerDocumento, setCustomerDocumento] = useState("");
   const [customerPassword, setCustomerPassword] = useState("");
 
   const [merchantShowPassword, setMerchantShowPassword] = useState(false);
@@ -55,8 +73,8 @@ export default function LoginPage() {
     setError("");
   }
 
-  function handleCustomerCnpjChange(value: string) {
-    setCustomerCnpj(formatCnpj(value));
+  function handleCustomerDocumentoChange(value: string) {
+    setCustomerDocumento(formatDocumento(value));
   }
 
   async function handleMerchantLogin(e: React.FormEvent<HTMLFormElement>) {
@@ -66,18 +84,26 @@ export default function LoginPage() {
     setError("");
 
     try {
-      const { error } = await supabase.auth.signInWithPassword({
-        email: merchantEmail,
-        password: merchantPassword,
-      });
+      const { data: authData, error: signInError } =
+        await supabase.auth.signInWithPassword({
+          email: merchantEmail,
+          password: merchantPassword,
+        });
 
-      if (error) {
+      if (signInError || !authData.user) {
         setError("Email ou senha inválidos.");
         return;
       }
 
-      router.push("/lojista");
-      router.refresh();
+      const { data: admin } = await supabase
+        .from("admins_plataforma")
+        .select("id")
+        .eq("auth_user_id", authData.user.id)
+        .eq("ativo", true)
+        .maybeSingle();
+
+      window.location.replace(admin ? "/admin" : "/lojista");
+      return;
     } catch {
       setError("Não foi possível entrar agora.");
     } finally {
@@ -92,17 +118,17 @@ export default function LoginPage() {
     setError("");
 
     try {
-      const normalizedCnpj = customerCnpj.replace(/\D/g, "");
+      const normalizedDocumento = customerDocumento.replace(/\D/g, "");
 
-      if (normalizedCnpj.length !== 14) {
-        setError("Informe um CNPJ válido.");
+      if (![11, 14].includes(normalizedDocumento.length)) {
+        setError("Informe um CPF ou CNPJ válido.");
         return;
       }
 
       const { data: cliente, error: clienteError } = await supabase
         .from("clientes")
-        .select("id, email, auth_user_id, pode_fazer_login")
-        .eq("cnpj", normalizedCnpj)
+        .select("id, email, auth_user_id, pode_fazer_login, documento")
+        .eq("documento", normalizedDocumento)
         .single<ClienteLoginRow>();
 
       if (clienteError || !cliente) {
@@ -127,7 +153,7 @@ export default function LoginPage() {
         });
 
       if (signInError) {
-        setError("CNPJ ou senha inválidos.");
+        setError("Documento ou senha inválidos.");
         return;
       }
 
@@ -150,8 +176,8 @@ export default function LoginPage() {
         .update({ ultimo_login_em: new Date().toISOString() })
         .eq("id", cliente.id);
 
-      router.push("/cliente");
-      router.refresh();
+      window.location.replace("/cliente");
+      return;
     } catch {
       setError("Não foi possível entrar agora.");
     } finally {
@@ -307,7 +333,7 @@ export default function LoginPage() {
 
               <div className="w-1/2 shrink-0 pl-2">
                 <CustomerLoginForm
-                  cnpj={customerCnpj}
+                  cnpj={customerDocumento}
                   password={customerPassword}
                   error={!isMerchant ? error : ""}
                   loading={loading && !isMerchant}
@@ -315,7 +341,7 @@ export default function LoginPage() {
                   onToggleShowPassword={() =>
                     setCustomerShowPassword((prev) => !prev)
                   }
-                  onCnpjChange={handleCustomerCnpjChange}
+                  onCnpjChange={handleCustomerDocumentoChange}
                   onPasswordChange={setCustomerPassword}
                   onSubmit={handleCustomerLogin}
                   onRecoverPassword={() => {

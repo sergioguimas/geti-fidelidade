@@ -1,8 +1,8 @@
-import type { NextRequest } from "next/server";
-import { getServerSupabase } from "@/lib/supabase/server";
+import { redirect } from "next/navigation";
+import { getPageSupabase } from "@/lib/supabase/server";
 
-export async function requireLojistaContext(request: NextRequest) {
-  const supabase = getServerSupabase(request);
+export async function requireLojistaPageContext() {
+  const supabase = await getPageSupabase();
 
   const {
     data: { user },
@@ -10,7 +10,7 @@ export async function requireLojistaContext(request: NextRequest) {
   } = await supabase.auth.getUser();
 
   if (userError || !user) {
-    throw new Error("Usuário não autenticado.");
+    redirect("/login");
   }
 
   const { data: vinculo, error: vinculoError } = await supabase
@@ -27,19 +27,15 @@ export async function requireLojistaContext(request: NextRequest) {
     .maybeSingle();
 
   if (vinculoError || !vinculo?.lojista_id) {
-    throw new Error("Vínculo com lojista não encontrado.");
+    redirect("/login");
   }
 
   const lojista = Array.isArray(vinculo.lojistas)
     ? vinculo.lojistas[0]
     : vinculo.lojistas;
 
-  if (!lojista) {
-    throw new Error("Lojista não encontrado.");
-  }
-
-  if (!lojista.ativo) {
-    throw new Error("Este lojista está bloqueado. Entre em contato com o suporte da plataforma.");
+  if (!lojista?.ativo) {
+    redirect("/login?blocked=1");
   }
 
   return {

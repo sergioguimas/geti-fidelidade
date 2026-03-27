@@ -1,10 +1,14 @@
 import { createClient } from "@supabase/supabase-js";
 
-export function getSupabaseAdmin() {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+export function createAdminClient() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-  return createClient(supabaseUrl, serviceRoleKey, {
+  if (!url || !serviceRoleKey) {
+    throw new Error("Variáveis do Supabase Admin não configuradas.");
+  }
+
+  return createClient(url, serviceRoleKey, {
     auth: {
       autoRefreshToken: false,
       persistSession: false,

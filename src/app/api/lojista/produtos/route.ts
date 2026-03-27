@@ -7,6 +7,13 @@ import {
   updateProduto,
 } from "@/lib/merchant/produtos";
 
+function resolveErrorStatus(message: string) {
+  if (message === "Usuário não autenticado.") return 401;
+  if (message === "Vínculo com lojista não encontrado.") return 403;
+  if (message === "Este lojista está bloqueado. Entre em contato com o suporte da plataforma.") return 403;
+  return 500;
+}
+
 export async function GET(request: NextRequest) {
   try {
     const { supabase, lojistaId } = await requireLojistaContext(request);
@@ -16,9 +23,12 @@ export async function GET(request: NextRequest) {
     const produtos = await listProdutos(supabase, lojistaId, busca);
     return NextResponse.json({ data: produtos });
   } catch (error) {
+    const message =
+      error instanceof Error ? error.message : "Erro ao listar produtos.";
+
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Erro ao listar produtos." },
-      { status: 500 }
+      { error: message },
+      { status: resolveErrorStatus(message) }
     );
   }
 }
@@ -38,9 +48,12 @@ export async function POST(request: NextRequest) {
     const produto = await createProduto(supabase, lojistaId, body);
     return NextResponse.json({ data: produto }, { status: 201 });
   } catch (error) {
+    const message =
+      error instanceof Error ? error.message : "Erro ao criar produto.";
+
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Erro ao criar produto." },
-      { status: 500 }
+      { error: message },
+      { status: resolveErrorStatus(message) }
     );
   }
 }
@@ -60,9 +73,12 @@ export async function PATCH(request: NextRequest) {
     const produto = await updateProduto(supabase, lojistaId, body);
     return NextResponse.json({ data: produto });
   } catch (error) {
+    const message =
+      error instanceof Error ? error.message : "Erro ao atualizar produto.";
+
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Erro ao atualizar produto." },
-      { status: 500 }
+      { error: message },
+      { status: resolveErrorStatus(message) }
     );
   }
 }
@@ -80,9 +96,12 @@ export async function DELETE(request: NextRequest) {
     const data = await deleteProduto(supabase, lojistaId, id);
     return NextResponse.json({ data });
   } catch (error) {
+    const message =
+      error instanceof Error ? error.message : "Erro ao excluir produto.";
+
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Erro ao excluir produto." },
-      { status: 500 }
+      { error: message },
+      { status: resolveErrorStatus(message) }
     );
   }
 }

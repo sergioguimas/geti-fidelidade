@@ -1,5 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { getSupabaseAdmin } from "@/lib/supabase/admin";
+import { createAdminClient } from "@/lib/supabase/admin";
 import type {
   ClienteCreateInput,
   ClienteListItem,
@@ -26,7 +26,7 @@ function isUniqueViolation(error: unknown) {
 }
 
 async function findGlobalClienteByCnpj(cnpj: string) {
-  const admin = getSupabaseAdmin();
+  const admin = createAdminClient();
 
   const { data, error } = await admin
     .from("clientes")
@@ -136,7 +136,7 @@ async function ensureClienteAuthAccess(
     return { authUserId: cliente.auth_user_id, createdNow: false };
   }
 
-  const admin = getSupabaseAdmin();
+  const admin = createAdminClient();
 
   const { data: createdUser, error: createUserError } =
     await admin.auth.admin.createUser({
@@ -295,7 +295,7 @@ export async function createCliente(
     if (cnpj) {
       cliente = await findGlobalClienteByCnpj(cnpj);
     } else {
-      const admin = getSupabaseAdmin();
+      const admin = createAdminClient();
 
       const { data, error } = await admin
         .from("clientes")

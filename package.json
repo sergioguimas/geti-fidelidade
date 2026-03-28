@@ -26,7 +26,8 @@
     "tailwind-merge": "^3.4.0",
     "three": "^0.183.2",
     "three-stdlib": "^2.36.1",
-    "vaul": "^1.1.2"
+    "vaul": "^1.1.2",
+    "xlsx": "^0.18.5"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",

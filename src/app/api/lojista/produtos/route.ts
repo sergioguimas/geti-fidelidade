@@ -16,6 +16,7 @@ function resolveErrorStatus(message: string) {
 
 export async function GET(request: NextRequest) {
   try {
+    console.log("Deu erro aqui ó");
     const { supabase, lojistaId } = await requireLojistaContext(request);
     const { searchParams } = new URL(request.url);
     const busca = searchParams.get("busca") ?? undefined;

@@ -16,6 +16,8 @@ export async function listProdutos(
   }
 
   const { data, error } = await query;
+  console.log("listProdutos debug", { lojistaId, data, error });
+
   if (error) throw new Error(error.message);
 
   return (data ?? []).map((item) => ({
@@ -41,7 +43,11 @@ export async function createProduto(
     .single();
 
   if (error) throw new Error(error.message);
-  return data;
+
+  return {
+    ...data,
+    teto_percentual: Number(data.teto_percentual),
+  };
 }
 
 export async function updateProduto(
@@ -62,7 +68,11 @@ export async function updateProduto(
     .single();
 
   if (error) throw new Error(error.message);
-  return data;
+
+  return {
+    ...data,
+    teto_percentual: Number(data.teto_percentual),
+  };
 }
 
 export async function deleteProduto(
@@ -77,5 +87,6 @@ export async function deleteProduto(
     .eq("lojista_id", lojistaId);
 
   if (error) throw new Error(error.message);
+
   return { success: true };
 }

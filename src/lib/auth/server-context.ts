@@ -15,14 +15,7 @@ export async function requireLojistaContext(request: NextRequest) {
 
   const { data: vinculo, error: vinculoError } = await supabase
     .from("lojistas_usuarios")
-    .select(`
-      lojista_id,
-      papel,
-      lojistas (
-        id,
-        ativo
-      )
-    `)
+    .select("lojista_id, papel")
     .eq("auth_user_id", user.id)
     .maybeSingle();
 
@@ -30,16 +23,20 @@ export async function requireLojistaContext(request: NextRequest) {
     throw new Error("Vínculo com lojista não encontrado.");
   }
 
-  const lojista = Array.isArray(vinculo.lojistas)
-    ? vinculo.lojistas[0]
-    : vinculo.lojistas;
+  const { data: lojista, error: lojistaError } = await supabase
+    .from("lojistas")
+    .select("id, ativo")
+    .eq("id", vinculo.lojista_id)
+    .maybeSingle();
 
-  if (!lojista) {
+  if (lojistaError || !lojista) {
     throw new Error("Lojista não encontrado.");
   }
 
   if (!lojista.ativo) {
-    throw new Error("Este lojista está bloqueado. Entre em contato com o suporte da plataforma.");
+    throw new Error(
+      "Este lojista está bloqueado. Entre em contato com o suporte da plataforma."
+    );
   }
 
   return {

@@ -1,6 +1,7 @@
 "use client";
 
 import { ChangeEvent, useEffect, useMemo, useRef, useState } from "react";
+import { SearchableSelect } from "../ui/searchable-select";
 import * as XLSX from "xlsx";
 import {
   AlertCircle,
@@ -11,6 +12,7 @@ import {
   Plus,
   Search,
   Trash2,
+  X,
 } from "lucide-react";
 
 
@@ -137,72 +139,6 @@ function normalizeDescricaoComparacao(value: string) {
     .replace(/[^a-z0-9\s]/g, " ")
     .replace(/\s+/g, " ")
     .trim();
-}
-
-function tokenizeDescricao(value: string) {
-  return normalizeDescricaoComparacao(value)
-    .split(" ")
-    .filter((token) => token.length > 1);
-}
-
-
-
-function calcularSimilaridadeDescricao(a: string, b: string) {
-  const na = normalizeDescricaoComparacao(a);
-  const nb = normalizeDescricaoComparacao(b);
-
-  if (!na || !nb) return 0;
-  if (na === nb) return 1;
-
-  const tokensA = tokenizeDescricao(a);
-  const tokensB = tokenizeDescricao(b);
-
-  if (!tokensA.length || !tokensB.length) return 0;
-
-  const setA = new Set(tokensA);
-  const setB = new Set(tokensB);
-
-  const intersecao = tokensA.filter((token) => setB.has(token)).length;
-  const uniao = new Set([...tokensA, ...tokensB]).size;
-
-  const jaccard = uniao > 0 ? intersecao / uniao : 0;
-
-  const contemBonus =
-    na.includes(nb) || nb.includes(na)
-      ? 0.2
-      : 0;
-
-  return Math.min(1, jaccard + contemBonus);
-}
-
-function sugerirProdutoExistente(
-  descricaoImportada: string,
-  produtosExistentes: ProdutoExistenteOption[],
-  threshold = 0.55
-) {
-  let melhor: ProdutoExistenteOption | null = null;
-  let melhorScore = 0;
-
-  for (const produto of produtosExistentes) {
-    const score = calcularSimilaridadeDescricao(
-      descricaoImportada,
-      produto.descricao
-    );
-
-    if (score > melhorScore) {
-      melhorScore = score;
-      melhor = produto;
-    }
-  }
-
-  if (!melhor || melhorScore < threshold) {
-    return null;
-  }
-
-  return {
-    produto: melhor,
-    score: melhorScore,
-  };
 }
 
 function parseCsvToRows(text: string): ProdutoImportRow[] {
@@ -342,32 +278,51 @@ function ImportacaoProdutosPreview({
   totalNovosParaCriar: number;
   totalAtualizados: number;
 }) {
-  const totalDuplicadosSelecionados = Object.values(duplicadosSelecionados).filter(Boolean).length;
+  const totalDuplicadosSelecionados = Object.values(
+    duplicadosSelecionados
+  ).filter(Boolean).length;
+
   const totalAssociadosParaAtualizar = previewNovosAssociados.length;
 
   return (
     <div className="space-y-4">
-      <section className="rounded-2xl border border-zinc-200 bg-white shadow-sm overflow-hidden p-5">
-        <h2 className="text-base font-semibold text-zinc">Resumo da análise</h2>
+      <section className="overflow-hidden rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm md:p-5">
+        <h2 className="text-base font-semibold text-zinc-900">
+          Resumo da análise
+        </h2>
 
-        <div className="mt-4 grid gap-4 md:grid-cols-4">
+        <div className="mt-4 grid grid-cols-2 gap-4 md:grid-cols-4">
           <div className="rounded-2xl border border-zinc-800 bg-zinc-950 p-4">
-            <p className="text-xs uppercase tracking-wide text-zinc-500">Linhas analisadas</p>
-            <p className="mt-2 text-2xl font-semibold text-white">{preview.resumo.totalLinhas}</p>
+            <p className="text-xs uppercase tracking-wide text-zinc-500">
+              Linhas analisadas
+            </p>
+            <p className="mt-2 text-2xl font-semibold text-white">
+              {preview.resumo.totalLinhas}
+            </p>
           </div>
 
           <div className="rounded-2xl border border-emerald-900/40 bg-emerald-950/70 p-4">
-            <p className="text-xs uppercase tracking-wide text-emerald-400/70">Novos</p>
-            <p className="mt-2 text-2xl font-semibold text-emerald-300">{totalNovosParaCriar}</p>
+            <p className="text-xs uppercase tracking-wide text-emerald-400/70">
+              Novos
+            </p>
+            <p className="mt-2 text-2xl font-semibold text-emerald-300">
+              {totalNovosParaCriar}
+            </p>
           </div>
 
           <div className="rounded-2xl border border-amber-900/40 bg-amber-950/70 p-4">
-            <p className="text-xs uppercase tracking-wide text-amber-400/70">Atualizações</p>
-            <p className="mt-2 text-2xl font-semibold text-amber-300">{totalAtualizados}</p>
+            <p className="text-xs uppercase tracking-wide text-amber-400/70">
+              Atualizações
+            </p>
+            <p className="mt-2 text-2xl font-semibold text-amber-300">
+              {totalAtualizados}
+            </p>
           </div>
 
           <div className="rounded-2xl border border-red-900/40 bg-red-950/70 p-4">
-            <p className="text-xs uppercase tracking-wide text-red-400/70">Inválidos</p>
+            <p className="text-xs uppercase tracking-wide text-red-400/70">
+              Inválidos
+            </p>
             <p className="mt-2 text-2xl font-semibold text-red-300">
               {preview.resumo.invalidos}
             </p>
@@ -376,64 +331,117 @@ function ImportacaoProdutosPreview({
       </section>
 
       {previewNovosNaoAssociados.length ? (
-        <section className="rounded-2xl border border-zinc-200 bg-white shadow-sm overflow-hidden p-5">
+        <section className="overflow-hidden rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm md:p-5">
           <div className="flex items-center gap-3">
-            <Plus className="h-5 w-5 text-emerald-400" />
-            <h2 className="text-base font-semibold text-zinc">Produtos novos</h2>
+            <Plus className="h-5 w-5 text-emerald-500" />
+            <h2 className="text-base font-semibold text-zinc-900">
+              Produtos novos
+            </h2>
           </div>
 
-          <div className="mt-4 overflow-x-auto">
+          <div className="mt-4 space-y-3 md:hidden">
+            {previewNovosNaoAssociados.map((item) => (
+              <div
+                key={`novo-mobile-${item.linha}`}
+                className="rounded-2xl border border-zinc-200 bg-zinc-50 p-4 shadow-sm"
+              >
+                <div className="mb-3 flex items-center justify-between">
+                  <span className="text-xs font-semibold uppercase tracking-wide text-zinc-500">
+                    Linha {item.linha}
+                  </span>
+                  <BoolBadge value={item.ativo} />
+                </div>
+
+                <div className="space-y-3">
+                  <div className="grid grid-cols-2">
+                    <div>
+                      <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Descrição</p>
+                      <p className="mt-1 text-sm text-zinc-700">{item.descricao}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Teto %</p>
+                      <p className="mt-1 text-sm text-zinc-700">{item.tetoPercentual}</p>
+                    </div>
+                  </div>
+
+                  <div>
+                    <p className="mb-2 text-3x1 font-semibold uppercase tracking-wide text-zinc-500">
+                      Associar a existente <span className="text-xs font-normal text-zinc-400"> (Vazio para novo)</span>
+                    </p>
+
+                    <SearchableSelect
+                      placeholder="Buscar produto existente..."
+                      emptyMessage="Nenhum produto encontrado."
+                      options={produtosExistentes}
+                      value={novosAssociados[item.linha]?.id ?? ""}
+                      onChange={(produtoId) => {
+                        if (!produtoId) {
+                          onRemoverAssociacaoNovo(item.linha);
+                          return;
+                        }
+
+                        onAssociarNovo(item.linha, produtoId);
+                      }}
+                      getOptionValue={(option) => option.id}
+                      getOptionLabel={(option) => option.descricao}
+                    />
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div className="mt-4 hidden overflow-x-auto md:block">
             <table className="w-full min-w-[980px] text-sm">
               <thead>
-                <tr className="border-b border-zinc-800 text-center text-zinc-600">
+                <tr className="border-b border-zinc-200 text-center text-zinc-600">
                   <th className="px-3 py-3 font-medium">Linha</th>
                   <th className="px-3 py-3 font-medium">Descrição</th>
                   <th className="px-3 py-3 font-medium">Valor</th>
                   <th className="px-3 py-3 font-medium">Status</th>
-                  <th className="px-3 py-3 font-medium text-left">Associar a existente</th>
+                  <th className="px-3 py-3 text-left font-medium">
+                    Associar a existente
+                  </th>
                 </tr>
               </thead>
 
               <tbody>
-                {previewNovosNaoAssociados.map((item) => {
-                  return (
-                    <tr
-                      key={`novo-${item.linha}`}
-                      className="border-b border-zinc-800/70 text-center"
-                    >
-                      <td className="px-3 py-3 text-zinc-600">{item.linha}</td>
-                      <td className="px-3 py-3 text-zinc-600">{item.descricao}</td>
-                      <td className="px-3 py-3 text-zinc-600">{item.tetoPercentual}</td>
-                      <td className="px-3 py-3">
-                        <BoolBadge value={item.ativo} />
-                      </td>
+                {previewNovosNaoAssociados.map((item) => (
+                  <tr
+                    key={`novo-${item.linha}`}
+                    className="border-b border-zinc-200 text-center"
+                  >
+                    <td className="px-3 py-3 text-zinc-600">{item.linha}</td>
+                    <td className="px-3 py-3 text-zinc-600">{item.descricao}</td>
+                    <td className="px-3 py-3 text-zinc-600">
+                      {item.tetoPercentual}
+                    </td>
+                    <td className="px-3 py-3">
+                      <BoolBadge value={item.ativo} />
+                    </td>
 
-                      <td className="px-3 py-3 text-left">
-                        <div className="space-y-2">
-                          <select
-                            value={novosAssociados[item.linha]?.id ?? ""}
-                            onChange={(e) => {
-                              if (!e.target.value) {
-                                onRemoverAssociacaoNovo(item.linha);
-                                return;
-                              }
+                    <td className="px-3 py-3 text-left">
+                      <div className="space-y-2">
+                        <SearchableSelect
+                          placeholder="Buscar produto existente..."
+                          emptyMessage="Nenhum produto encontrado."
+                          options={produtosExistentes}
+                          value={novosAssociados[item.linha]?.id ?? ""}
+                          onChange={(produtoId) => {
+                            if (!produtoId) {
+                              onRemoverAssociacaoNovo(item.linha);
+                              return;
+                            }
 
-                              onAssociarNovo(item.linha, e.target.value);
-                            }}
-                            className="w-full rounded-lg border border-zinc-400 px-3 py-2 outline-none focus:border-zinc-500 bg-zinc-100 text-zinc-700"
-                          >
-                            <option value="">Criar novo</option>
-                            {produtosExistentes.map((produto) => (
-                              <option key={produto.id} value={produto.id}>
-                                {produto.descricao}
-                              </option>
-                            ))}
-                          </select>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
+                            onAssociarNovo(item.linha, produtoId);
+                          }}
+                          getOptionValue={(option) => option.id}
+                          getOptionLabel={(option) => option.descricao}
+                        />
+                      </div>
+                    </td>
+                  </tr>
+                ))}
               </tbody>
             </table>
           </div>
@@ -441,10 +449,10 @@ function ImportacaoProdutosPreview({
       ) : null}
 
       {previewNovosAssociados.length ? (
-        <section className="rounded-2xl border border-zinc-200 bg-white shadow-sm overflow-hidden p-5">
+        <section className="overflow-hidden rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm md:p-5">
           <div className="flex items-center gap-3">
             <CheckCircle2 className="h-5 w-5 text-blue-500" />
-            <h2 className="text-base font-semibold text-zinc">
+            <h2 className="text-base font-semibold text-zinc-900">
               Produtos para atualização
             </h2>
           </div>
@@ -454,14 +462,66 @@ function ImportacaoProdutosPreview({
             existente.
           </p>
 
-          <div className="mt-4 overflow-x-auto">
+          <div className="mt-4 space-y-3 md:hidden">
+            {previewNovosAssociados.map((item) => (
+              <div
+                key={`novo-associado-mobile-${item.linha}-${item.associado?.id}`}
+                className="rounded-2xl border border-zinc-200 bg-zinc-50 p-4 shadow-sm"
+              >
+                <div className="mb-3 flex items-center justify-between">
+                  <span className="text-xs font-semibold uppercase tracking-wide text-zinc-500">
+                    Linha {item.linha}
+                  </span>
+
+                  <button
+                    type="button"
+                    onClick={() => onRemoverAssociacaoNovo(item.linha)}
+                    className="inline-flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs font-medium text-red-700 transition hover:bg-red-100"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                    Voltar
+                  </button>
+                </div>
+
+                <div className="space-y-3">
+                  <div className="grid grid-cols-2">
+                    <div>
+                      <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500">
+                        Descrição importada
+                      </p>
+                      <div className="mt-1 flex flex-col">
+                        <span className="text-sm text-zinc-700">{item.descricao}</span>
+                        {item.associado?.descricao &&
+                        item.associado.descricao !== item.descricao ? (
+                          <span className="text-xs text-amber-600">
+                            Corrigido para: {item.associado.descricao}
+                          </span>
+                        ) : null}
+                      </div>
+                    </div>
+
+                    <div>
+                      <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500">
+                        Valor importado
+                      </p>
+                      <p className="mt-1 text-sm text-zinc-700">
+                        {item.tetoPercentual}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div className="mt-4 hidden overflow-x-auto md:block">
             <table className="w-full min-w-[980px] text-sm">
               <thead>
-                <tr className="border-b border-zinc-800 text-left text-zinc-600">
+                <tr className="border-b border-zinc-200 text-left text-zinc-600">
                   <th className="px-3 py-3 font-medium">Linha</th>
                   <th className="px-3 py-3 font-medium">Descrição importada</th>
                   <th className="px-3 py-3 font-medium">Valor importado</th>
-                  <th className="px-3 py-3 font-medium">Descrição Atual</th>
+                  <th className="px-3 py-3 font-medium">Descrição atual</th>
                   <th className="px-3 py-3 font-medium">Ação</th>
                 </tr>
               </thead>
@@ -470,7 +530,7 @@ function ImportacaoProdutosPreview({
                 {previewNovosAssociados.map((item) => (
                   <tr
                     key={`novo-associado-${item.linha}-${item.associado?.id}`}
-                    className="border-b border-zinc-800/70"
+                    className="border-b border-zinc-200"
                   >
                     <td className="px-3 py-3 text-zinc-600">{item.linha}</td>
 
@@ -486,14 +546,18 @@ function ImportacaoProdutosPreview({
                       </div>
                     </td>
 
-                    <td className="px-3 py-3 text-zinc-600">{item.tetoPercentual}</td>
-                    <td className="px-3 py-3 text-zinc-600">{item.associado?.descricao}</td>
+                    <td className="px-3 py-3 text-zinc-600">
+                      {item.tetoPercentual}
+                    </td>
+                    <td className="px-3 py-3 text-zinc-600">
+                      {item.associado?.descricao}
+                    </td>
 
                     <td className="px-3 py-3">
                       <button
                         type="button"
                         onClick={() => onRemoverAssociacaoNovo(item.linha)}
-                        className="inline-flex items-center gap-2 rounded-lg border border-red-900/60 bg-red-950 px-3 py-2 text-xs font-medium text-red-200 transition hover:bg-red-950/50"
+                        className="inline-flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs font-medium text-red-700 transition hover:bg-red-100"
                       >
                         <Trash2 className="h-3.5 w-3.5" />
                         Voltar para novo
@@ -508,12 +572,14 @@ function ImportacaoProdutosPreview({
       ) : null}
 
       {preview.duplicados.length ? (
-        <section className="rounded-2xl border border-zinc-200 bg-white shadow-sm overflow-hidden p-5">
+        <section className="overflow-hidden rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm md:p-5">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <h2 className="text-base font-semibold text-zinc">Produtos duplicados</h2>
+              <h2 className="text-base font-semibold text-zinc-900">
+                Produtos duplicados
+              </h2>
               <p className="mt-1 text-sm text-zinc-600">
-                Marque os itens que devem atualizar o cadastro existente.
+                Marque os itens para atualizar o cadastro existente.
               </p>
             </div>
 
@@ -535,14 +601,85 @@ function ImportacaoProdutosPreview({
             </div>
           </div>
 
-          <div className="mt-4 overflow-x-auto">
+          <div className="mt-4 space-y-3 md:hidden">
+            {preview.duplicados.map((item) => {
+              const checked = !!duplicadosSelecionados[item.existente.id];
+
+              return (
+                <div
+                  key={`dup-mobile-${item.linha}-${item.existente.id}`}
+                  className="rounded-2xl border border-zinc-200 bg-zinc-50 p-4 shadow-sm"
+                >
+                  <div className="mb-3 flex items-center justify-between gap-3">
+                    <span className="text-xs font-semibold uppercase tracking-wide text-zinc-500">
+                      Linha {item.linha}
+                    </span>
+
+                    <label className="inline-flex items-center gap-2 text-sm font-medium text-zinc-700">
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        onChange={() => onToggleDuplicado(item.existente.id)}
+                        className="h-4 w-4 rounded border-zinc-400"
+                      />
+                      Atualizar
+                    </label>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="rounded-xl border border-zinc-200 bg-white p-3">
+                      <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500">
+                        Novo registro
+                      </p>
+                      <div className="mt-2 space-y-1 text-sm text-zinc-700">
+                        <p>
+                          <span className="font-medium">Descrição:</span>{" "}
+                          {item.descricao}
+                        </p>
+                        <p>
+                          <span className="font-medium">Teto:</span>{" "}
+                          {item.tetoPercentual}
+                        </p>
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium text-zinc-700">Status:</span>
+                          <BoolBadge value={item.ativo} />
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="rounded-xl border border-zinc-200 bg-white p-3">
+                      <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500">
+                        Cadastro existente
+                      </p>
+                      <div className="mt-2 space-y-1 text-sm text-zinc-700">
+                        <p>
+                          <span className="font-medium">Descrição:</span>{" "}
+                          {item.existente.descricao}
+                        </p>
+                        <p>
+                          <span className="font-medium">Teto:</span>{" "}
+                          {item.existente.tetoPercentual}
+                        </p>
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium text-zinc-700">Status:</span>
+                          <BoolBadge value={item.existente.ativo} />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          <div className="mt-4 hidden overflow-x-auto md:block">
             <table className="w-full min-w-[980px] text-sm">
               <thead>
-                <tr className="border-b border-zinc-800 text-left text-zinc-600">
+                <tr className="border-b border-zinc-200 text-left text-zinc-600">
                   <th className="px-3 py-3 font-medium">Atualizar</th>
-                  <th className="px-3 py-3 font-medium">Nova Descrição</th>
-                  <th className="px-3 py-3 font-medium">Novo Teto</th>
-                  <th className="px-3 py-3 font-medium">Nova Situação</th>
+                  <th className="px-3 py-3 font-medium">Nova descrição</th>
+                  <th className="px-3 py-3 font-medium">Novo teto</th>
+                  <th className="px-3 py-3 font-medium">Nova situação</th>
                   <th className="px-3 py-3 font-medium">Descrição existente</th>
                   <th className="px-3 py-3 font-medium">Teto atual</th>
                   <th className="px-3 py-3 font-medium">Status atual</th>
@@ -556,22 +693,26 @@ function ImportacaoProdutosPreview({
                   return (
                     <tr
                       key={`dup-${item.linha}-${item.existente.id}`}
-                      className="border-b border-zinc-800/70"
+                      className="border-b border-zinc-200"
                     >
                       <td className="px-3 py-3">
                         <input
                           type="checkbox"
                           checked={checked}
                           onChange={() => onToggleDuplicado(item.existente.id)}
-                          className="h-4 w-4 rounded border-zinc-700 bg-zinc-950 text-white"
+                          className="h-4 w-4 rounded border-zinc-400"
                         />
                       </td>
                       <td className="px-3 py-3 text-zinc-600">{item.descricao}</td>
-                      <td className="px-3 py-3 text-zinc-600">{item.tetoPercentual}</td>
+                      <td className="px-3 py-3 text-zinc-600">
+                        {item.tetoPercentual}
+                      </td>
                       <td className="px-3 py-3">
                         <BoolBadge value={item.ativo} />
                       </td>
-                      <td className="px-3 py-3 text-zinc-600">{item.existente.descricao}</td>
+                      <td className="px-3 py-3 text-zinc-600">
+                        {item.existente.descricao}
+                      </td>
                       <td className="px-3 py-3 text-zinc-600">
                         {item.existente.tetoPercentual}
                       </td>
@@ -587,20 +728,24 @@ function ImportacaoProdutosPreview({
 
           <div className="mt-3 text-sm text-zinc-500">
             Duplicados selecionados para atualização:{" "}
-            <span className="font-medium text-zinc-700">{totalDuplicadosSelecionados}</span>
+            <span className="font-medium text-zinc-700">
+              {totalDuplicadosSelecionados}
+            </span>
           </div>
         </section>
       ) : null}
 
       {preview.invalidos.length ? (
-        <section className="rounded-2xl border border-zinc-200 bg-white shadow-sm overflow-hidden p-5">
-          <h2 className="text-base font-semibold text-zinc">Linhas inválidas</h2>
+        <section className="overflow-hidden rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm md:p-5">
+          <h2 className="text-base font-semibold text-zinc-900">
+            Linhas inválidas
+          </h2>
 
           <div className="mt-4 space-y-2">
             {preview.invalidos.map((item) => (
               <div
                 key={`inv-${item.linha}-${item.motivo}`}
-                className="rounded-xl border border-red-900/50 bg-red-950/20 p-3 text-sm text-red-200"
+                className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700"
               >
                 <span className="font-medium">Linha {item.linha}</span>
                 {item.descricaoOriginal ? ` · ${item.descricaoOriginal}` : ""} —{" "}
@@ -611,22 +756,30 @@ function ImportacaoProdutosPreview({
         </section>
       ) : null}
 
-      <section className="rounded-2xl border border-zinc-200 bg-white shadow-sm overflow-hidden p-5">
+      <section className="overflow-hidden rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm md:p-5">
         <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <div>
-            <h2 className="text-base font-semibold text-zinc">Confirmar importação</h2>
+            <h2 className="text-base font-semibold text-zinc-900">
+              Confirmar importação
+            </h2>
             <p className="mt-1 text-sm text-zinc-500">
               Serão criados{" "}
-              <span className="font-medium text-zinc-700">{totalNovosParaCriar}</span>{" "}
+              <span className="font-medium text-zinc-700">
+                {totalNovosParaCriar}
+              </span>{" "}
               produtos novos e atualizados{" "}
-              <span className="font-medium text-zinc-700">{totalAtualizados}</span>{" "}
+              <span className="font-medium text-zinc-700">
+                {totalAtualizados}
+              </span>{" "}
               produtos existentes.
             </p>
+
             {totalAssociadosParaAtualizar > 0 ? (
               <p className="mt-1 text-xs text-zinc-400">
-                Desses, <span className="font-medium">{totalAssociadosParaAtualizar}</span>{" "}
-                vieram de associação manual/automática de itens inicialmente classificados
-                como novos.
+                Desses,{" "}
+                <span className="font-medium">{totalAssociadosParaAtualizar}</span>{" "}
+                vieram de associação manual/automática de itens inicialmente
+                classificados como novos.
               </p>
             ) : null}
           </div>
@@ -635,7 +788,7 @@ function ImportacaoProdutosPreview({
             type="button"
             onClick={onConfirm}
             disabled={loadingConfirm}
-            className="inline-flex items-center justify-center gap-2 rounded-xl bg-white px-4 py-2 text-sm font-semibold text-zinc-900 transition hover:bg-zinc-200 disabled:cursor-not-allowed disabled:opacity-60"
+            className="inline-flex items-center justify-center gap-2 rounded-xl border border-zinc-200 bg-white px-4 py-2 text-sm font-semibold text-zinc-900 transition hover:bg-zinc-100 disabled:cursor-not-allowed disabled:opacity-60"
           >
             {loadingConfirm ? (
               <Loader2 className="h-4 w-4 animate-spin" />
@@ -668,7 +821,11 @@ function ImportacaoProdutosTableEditor({
     return rows.filter((row) => row.descricao.trim() || row.valor.trim()).length;
   }, [rows]);
 
-  function updateRow(index: number, field: keyof ProdutoImportRow, value: string | boolean) {
+  function updateRow(
+    index: number,
+    field: keyof ProdutoImportRow,
+    value: string | boolean
+  ) {
     const next = [...rows];
     next[index] = {
       ...next[index],
@@ -755,19 +912,24 @@ function ImportacaoProdutosTableEditor({
   }
 
   return (
-    <section className="rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm">
+    <section className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm md:p-6">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div>
-          <h2 className="text-xl font-semibold text-zinc">Tabela de importação</h2>
-          <p className="mt-1 text-sm text-zinc-800">
+          <h2 className="text-lg font-semibold text-zinc-900 md:text-xl">
+            Tabela de importação
+          </h2>
+
+          <p className="mt-1 text-sm text-zinc-600">
             Envie um CSV/planilha ou preencha manualmente a tabela. O sistema gera o
             arquivo final automaticamente.
           </p>
-          <p className="mt-1 text-sm text-zinc-800">
+
+          <p className="mt-1 text-sm text-zinc-600 break-all">
             Cabeçalho esperado do arquivo: {CSV_HEADER}
           </p>
         </div>
-        <div className="flex flex-col gap-2">
+
+        <div className="flex flex-col gap-2 sm:flex-row lg:flex-col">
           <input
             ref={fileInputRef}
             type="file"
@@ -776,43 +938,130 @@ function ImportacaoProdutosTableEditor({
             onChange={handleFileChange}
             id="importacao-produtos-arquivo"
           />
+
           <label
             htmlFor="importacao-produtos-arquivo"
-            className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-zinc-700 bg-zinc-950 px-4 py-2 text-sm font-medium text-zinc-200 transition hover:border-zinc-600 hover:text-white"
+            className="inline-flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-zinc-700 bg-zinc-950 px-4 py-2 text-sm font-medium text-zinc-200 transition hover:border-zinc-600 hover:text-white"
           >
             <FileUp className="h-4 w-4" />
             Importar planilha / CSV
           </label>
+
           <button
             type="button"
             onClick={addRow}
-            className="inline-flex items-center gap-2 rounded-xl border border-zinc-700 bg-zinc-950 px-4 py-2 text-sm font-medium text-zinc-200 transition hover:border-zinc-600 hover:text-white"
+            className="inline-flex items-center justify-center gap-2 rounded-xl border border-zinc-700 bg-zinc-950 px-4 py-2 text-sm font-medium text-zinc-200 transition hover:border-zinc-600 hover:text-white"
           >
             <Plus className="h-4 w-4" />
-            Novo Item
+            Novo item
           </button>
         </div>
       </div>
 
-      <div className="mt-4 overflow-x-auto">
+      <div className="mt-4 md:hidden">
+        <div className="flex flex-col gap-3">
+          {rows.map((row, index) => (
+            <div
+              key={index}
+              className="rounded-2xl border border-zinc-200 bg-zinc-50 p-4 shadow-sm"
+            >
+              <div className="mb-3 flex items-center justify-between">
+                <span className="text-xs font-semibold uppercase tracking-wide text-zinc-500">
+                  Item {index + 1}
+                </span>
+
+                <button
+                  type="button"
+                  onClick={() => removeRow(index)}
+                  className="inline-flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs font-medium text-red-700 transition hover:bg-red-100"
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                  Remover
+                </button>
+              </div>
+
+              <div className="space-y-3">
+                <div>
+                  <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-zinc-500">
+                    Descrição
+                  </label>
+                  <input
+                    value={row.descricao}
+                    onChange={(e) => updateRow(index, "descricao", e.target.value)}
+                    className="w-full rounded-lg border border-zinc-300 bg-white px-3 py-2.5 text-sm outline-none transition focus:border-zinc-500"
+                    placeholder="Descrição"
+                  />
+                </div>
+
+                <div>
+                  <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-zinc-500">
+                    Teto de pontuação
+                  </label>
+                  <input
+                    value={row.valor}
+                    onChange={(e) => updateRow(index, "valor", e.target.value)}
+                    className="w-full rounded-lg border border-zinc-300 bg-white px-3 py-2.5 text-sm outline-none transition focus:border-zinc-500"
+                    placeholder="Ex.: 10.50"
+                    inputMode="decimal"
+                  />
+                </div>
+
+                <div className="flex items-center justify-between rounded-xl border border-zinc-200 bg-white px-3 py-3">
+                  <div>
+                    <p className="text-sm font-medium text-zinc-900">Status</p>
+                    <p className="text-xs text-zinc-500">
+                      Defina se o produto ficará ativo na importação
+                    </p>
+                  </div>
+
+                  <label className="inline-flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      checked={row.ativo}
+                      onChange={(e) => updateRow(index, "ativo", e.target.checked)}
+                      className="h-4 w-4 rounded border-zinc-400"
+                    />
+
+                    {row.ativo ? (
+                      <CheckCircle2 className="h-6 w-6 rounded-lg border border-emerald-200 bg-emerald-500 p-1 text-white shadow-sm" />
+                    ) : (
+                      <AlertCircle className="h-6 w-6 rounded-lg border border-red-200 bg-red-500 p-1 text-white shadow-sm" />
+                    )}
+                  </label>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="mt-4 hidden overflow-x-auto md:block">
         <table className="w-full min-w-[820px] text-sm">
-          <thead className="bg-zinc-50 border-b border-zinc-600">
+          <thead className="border-b border-zinc-200 bg-zinc-50">
             <tr className="text-left">
-              <th className="px-4 py-3 text-xs font-semibold uppercase text-zinc-500">Descrição</th>
-              <th className="px-4 py-3 text-xs font-semibold uppercase text-zinc-500">Teto de pontuação</th>
-              <th className="px-4 py-3 text-xs font-semibold uppercase text-zinc-500">Ativo</th>
-              <th className="px-4 py-3 text-xs font-semibold uppercase text-zinc-500">Ação</th>
+              <th className="px-4 py-3 text-xs font-semibold uppercase text-zinc-500">
+                Descrição
+              </th>
+              <th className="px-4 py-3 text-xs font-semibold uppercase text-zinc-500">
+                Teto de pontuação
+              </th>
+              <th className="px-4 py-3 text-xs font-semibold uppercase text-zinc-500">
+                Ativo
+              </th>
+              <th className="px-4 py-3 text-xs font-semibold uppercase text-zinc-500">
+                Ação
+              </th>
             </tr>
           </thead>
 
           <tbody className="divide-y divide-zinc-100">
             {rows.map((row, index) => (
-              <tr key={index} className="border-b border-zinc-800/70">
+              <tr key={index} className="border-b border-zinc-200">
                 <td className="px-3 py-3">
                   <input
                     value={row.descricao}
                     onChange={(e) => updateRow(index, "descricao", e.target.value)}
-                    className="w-full rounded-lg border border-zinc-400 px-3 py-2 outline-none focus:border-zinc-400 bg-zinc-100"
+                    className="w-full rounded-lg border border-zinc-300 bg-zinc-100 px-3 py-2 outline-none transition focus:border-zinc-500"
                     placeholder="Descrição"
                   />
                 </td>
@@ -821,25 +1070,30 @@ function ImportacaoProdutosTableEditor({
                   <input
                     value={row.valor}
                     onChange={(e) => updateRow(index, "valor", e.target.value)}
-                    className="w-full rounded-lg border border-zinc-400 px-3 py-2 outline-none focus:border-zinc-400 bg-zinc-100"
+                    className="w-full rounded-lg border border-zinc-300 bg-zinc-100 px-3 py-2 outline-none transition focus:border-zinc-500"
                     placeholder="Ex.: 10.50"
                     inputMode="decimal"
                   />
                 </td>
 
                 <td className="px-3 py-3">
-                  <label className="inline-flex items-center gap-3 text-zinc-200">
+                  <label className="inline-flex items-center gap-3 text-zinc-700">
                     <input
                       type="checkbox"
                       checked={row.ativo}
                       onChange={(e) => updateRow(index, "ativo", e.target.checked)}
-                      className="h-4 w-4 rounded border-zinc-700 bg-zinc-950"
+                      className="h-4 w-4 rounded border-zinc-400"
                     />
-                    {row.ativo ? (<div>
-                      <CheckCircle2 className="rounded-lg border border-red-900/60 bg-emerald-500 p-1 text-zinc shadow-2xs"/>
-                    </div>) : (<div>
-                      <AlertCircle className="rounded-lg border border-red-900/60 bg-red-500 p-1 text-zinc shadow-2xs"/>
-                    </div>) }
+
+                    {row.ativo ? (
+                      <div>
+                        <CheckCircle2 className="h-6 w-6 rounded-lg border border-emerald-200 bg-emerald-500 p-1 text-white shadow-sm" />
+                      </div>
+                    ) : (
+                      <div>
+                        <AlertCircle className="h-6 w-6 rounded-lg border border-red-200 bg-red-500 p-1 text-white shadow-sm" />
+                      </div>
+                    )}
                   </label>
                 </td>
 
@@ -847,7 +1101,7 @@ function ImportacaoProdutosTableEditor({
                   <button
                     type="button"
                     onClick={() => removeRow(index)}
-                    className="inline-flex items-center gap-2 rounded-lg border border-red-900/60 bg-red-950 px-3 py-2 text-xs font-medium text-red-200 transition hover:bg-red-950/50"
+                    className="inline-flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs font-medium text-red-700 transition hover:bg-red-100"
                   >
                     <Trash2 className="h-3.5 w-3.5" />
                     Remover
@@ -860,24 +1114,28 @@ function ImportacaoProdutosTableEditor({
       </div>
 
       <div className="mt-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-        <p className="text-sm text-zinc-400">
+        <p className="text-sm text-zinc-500">
           Linhas preenchidas:{" "}
-          <span className="font-medium text-zinc-200">{totalPreenchidas}</span>
+          <span className="font-medium text-zinc-900">{totalPreenchidas}</span>
         </p>
 
         <button
           type="button"
           onClick={handleAnalyzeClick}
           disabled={loading}
-          className="inline-flex items-center gap-2 rounded-xl bg-white px-4 py-2 text-sm font-semibold text-zinc-900 transition hover:bg-zinc-200 disabled:cursor-not-allowed disabled:opacity-60"
+          className="inline-flex items-center justify-center gap-2 rounded-xl border border-zinc-200 bg-white px-4 py-2 text-sm font-semibold text-zinc-900 transition hover:bg-zinc-100 disabled:cursor-not-allowed disabled:opacity-60"
         >
-          {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
+          {loading ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : (
+            <Search className="h-4 w-4" />
+          )}
           Analisar importação
         </button>
       </div>
 
       {error ? (
-        <div className="mt-4 rounded-xl border border-red-900/50 bg-red-950/20 px-4 py-3 text-sm text-red-200">
+        <div className="mt-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
           {error}
         </div>
       ) : null}
@@ -1132,50 +1390,59 @@ export function ImportacaoProdutosPage() {
 
   return (
     <div className="flex flex-col gap-6 fundo">
-      <header className="rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div className="flex-1">
-            <div className="flex gap-2 items-center rounded-2xl border border-zinc-800 bg-zinc-950 p-3">
-              <FileSpreadsheet className="h-6 w-6 text-zinc-300" />
-              <h1 className="text-2xl font-semibold text-white">Importação de produtos</h1>
-            </div>
-            <div className="flex justify-between mt-3">
-              <p className="mt-2 max-w-3xl text-sm leading-relaxed text-zinc">
-                Envie uma planilha ou preencha a tabela manualmente. O sistema valida os
-                dados, identifica novos produtos, detecta duplicados pela descrição e permite
-                revisar tudo antes de confirmar.
-              </p>
-              <button
-                type="button"
-                onClick={baixarModeloCsv}
-                className="inline-flex items-center gap-2 rounded-xl border border-zinc-700 bg-zinc-950 px-4 py-2 text-sm font-medium text-zinc-200 transition hover:border-zinc-600 hover:text-white"
-              >
-                <FileSpreadsheet className="h-4 w-4" />
-                Baixar modelo
-              </button>
-            </div>
+      <header className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm md:p-6">
+        <div className="flex flex-col gap-4">
+          <div className="inline-flex w-full items-center gap-3 rounded-2xl border border-zinc-800 bg-zinc-950 px-4 py-4">
+            <FileSpreadsheet className="h-5 w-5 shrink-0 text-zinc-300 md:h-6 md:w-6" />
+            <h1 className="text-xl font-semibold text-white md:text-2xl">
+              Importação de produtos
+            </h1>
+          </div>
+
+          <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+            <p className="max-w-3xl text-sm leading-7 text-zinc-700 md:text-[15px]">
+              Envie uma planilha ou preencha a tabela manualmente. O sistema valida os
+              dados, identifica novos produtos, detecta duplicados pela descrição e
+              permite revisar tudo antes de confirmar.
+            </p>
+
+            <button
+              type="button"
+              onClick={baixarModeloCsv}
+              className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-zinc-700 bg-zinc-950 px-4 py-3 text-sm font-medium text-zinc-200 transition hover:border-zinc-600 hover:text-white md:w-auto md:self-start"
+            >
+              <FileSpreadsheet className="h-4 w-4" />
+              Baixar modelo
+            </button>
           </div>
         </div>
 
-        <div className="rounded-2xl border border-zinc-800 bg-zinc-900/60 p-5 mt-6">
-          <div className="space-y-4 text-sm text-zinc-400">
-            <div className="grid grid-cols-3 items-start gap-6 divide-x-4">
-              <div>
-                <p className="font-medium text-zinc-200 border-b-2 border-zinc-400">Campo ativo</p>
-                <p className="mt-1 text-zinc-300 text-zinc-300">
-                  A tabela usa checkbox e o sistema converte automaticamente para SIM/NAO.
-                </p>
-              </div>
-              <div>
-                <p className="font-medium text-zinc-200 border-b-2 border-zinc-400">Detecção de duplicidade</p>
-                <p className="mt-1 text-zinc-300">
-                  A comparação é feita pela descrição normalizada dentro da mesma loja.
-                </p>
-              </div>
-              <div>
-                <p className="font-medium text-zinc-200 border-b-2 border-zinc-400">Planilhas aceitas</p>
-                <p className="mt-1 text-zinc-300">CSV, XLS e XLSX</p>
-              </div>
+        <div className="mt-6 rounded-2xl border border-zinc bg-zinc-800/80 p-2 md:p-5">
+          <div className="grid gap-2 text-sm text-zinc-100 md:grid-cols-3 md:gap-6">
+            <div className="md:border-r md:border-zinc-300 md:pr-6 text-center md:text-start">
+              <p className="inline-block md:border-b border-zinc-200 font-semibold text-white">
+                Status
+              </p>
+              <p className="mt-2 leading-7 text-zinc-100/95">
+                A tabela usa a marcação e o sistema converte automaticamente para
+                SIM/NÃO.
+              </p>
+            </div>
+
+            <div className="border-t border-zinc-300 pt-2 md:border-t-0 text-center md:text-start md:border-r md:pr-6">
+              <p className="inline-block md:border-b border-zinc-200 pb-1 font-semibold text-white">
+                Detecção de duplicidade
+              </p>
+              <p className="mt-2 leading-7 text-zinc-100/95">
+                A comparação é feita pela descrição normalizada dentro da mesma loja.
+              </p>
+            </div>
+
+            <div className="border-t border-zinc-300 pt-2 md:border-t-0 text-center md:text-start">
+              <p className="inline-block md:border-b border-zinc-200 pb-1 font-semibold text-white">
+                Planilhas aceitas
+              </p>
+              <p className="mt-2 leading-7 text-zinc-100/95">CSV, XLS e XLSX</p>
             </div>
           </div>
         </div>

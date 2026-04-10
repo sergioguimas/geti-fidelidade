@@ -24,6 +24,7 @@ export default function PrimeiroAcessoForm() {
         setError("");
 
         const code = searchParams.get("code");
+        const hash = window.location.hash;
 
         if (code) {
           const { error: exchangeError } =
@@ -34,6 +35,24 @@ export default function PrimeiroAcessoForm() {
               "Não foi possível validar o link de acesso. Solicite um novo convite."
             );
             return;
+          }
+        } else if (hash.includes("access_token")) {
+          const hashParams = new URLSearchParams(hash.replace(/^#/, ""));
+          const accessToken = hashParams.get("access_token");
+          const refreshToken = hashParams.get("refresh_token");
+
+          if (accessToken && refreshToken) {
+            const { error: sessionError } = await supabase.auth.setSession({
+              access_token: accessToken,
+              refresh_token: refreshToken,
+            });
+
+            if (sessionError) {
+              setError(
+                "Não foi possível validar o link de acesso. Solicite um novo convite."
+              );
+              return;
+            }
           }
         }
 

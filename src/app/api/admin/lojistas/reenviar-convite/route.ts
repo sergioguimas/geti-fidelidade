@@ -12,8 +12,7 @@ export async function POST(request: NextRequest) {
     const supabaseAdmin = createAdminClient();
 
     const body = await request.json();
-
-    const lojistaId = body.lojistaId;
+    const lojistaId = String(body.lojistaId ?? "").trim();
 
     if (!lojistaId) {
       return NextResponse.json(
@@ -21,8 +20,6 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
-
-    // ================= BUSCAR LOJISTA =================
 
     const { data: lojista, error: lojistaError } = await supabaseAdmin
       .from("lojistas")
@@ -37,8 +34,6 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // ================= BUSCAR USUÁRIO AUTH =================
-
     const { data: vinculo, error: vinculoError } = await supabaseAdmin
       .from("lojistas_usuarios")
       .select("auth_user_id")
@@ -46,28 +41,24 @@ export async function POST(request: NextRequest) {
       .eq("papel", "owner")
       .single();
 
-    if (vinculoError || !vinculo) {
+    if (vinculoError || !vinculo?.auth_user_id) {
       return NextResponse.json(
         { error: "Usuário do lojista não encontrado." },
         { status: 404 }
       );
     }
 
-    const authUserId = vinculo.auth_user_id;
-
     const { data: userData, error: userError } =
-      await supabaseAdmin.auth.admin.getUserById(authUserId);
+      await supabaseAdmin.auth.admin.getUserById(vinculo.auth_user_id);
 
-    if (userError || !userData?.user?.email) {
+    const loginEmail = userData?.user?.email?.trim().toLowerCase();
+
+    if (userError || !loginEmail) {
       return NextResponse.json(
-        { error: "Email do usuário não encontrado." },
+        { error: "Email de login do lojista não encontrado." },
         { status: 404 }
       );
     }
-
-    const loginEmail = userData.user.email;
-
-    // ================= GERAR LINK =================
 
     const redirectTo = `${process.env.NEXT_PUBLIC_APP_URL}/primeiro-acesso`;
 
@@ -81,7 +72,7 @@ export async function POST(request: NextRequest) {
       });
 
     if (linkError) {
-      console.error(linkError);
+      console.error("Erro ao gerar link de recovery:", linkError);
       return NextResponse.json(
         { error: "Erro ao gerar link de acesso." },
         { status: 500 }
@@ -90,24 +81,29 @@ export async function POST(request: NextRequest) {
 
     const actionLink = linkData?.properties?.action_link;
 
-    // ================= WHATSAPP =================
+    if (!actionLink) {
+      return NextResponse.json(
+        { error: "Não foi possível gerar o link de acesso." },
+        { status: 500 }
+      );
+    }
 
-    if (lojista.telefone && actionLink) {
+    if (lojista.telefone && process.env.N8N_WEBHOOK_WHATSAPP) {
       const telefone = normalizePhone(lojista.telefone);
 
       const mensagem = `Olá ${
         lojista.nome_responsavel ?? lojista.nome_fantasia
       }! 👋
 
-    Reenvio de acesso ao sistema de fidelidade.
+Reenvio de acesso ao sistema de fidelidade.
 
-    Para definir sua senha e acessar:
-    👉 ${actionLink}
+Para definir sua senha e acessar:
+👉 ${actionLink}
 
-    Se não foi você, ignore esta mensagem.`;
+Se não foi você, ignore esta mensagem.`;
 
       try {
-        await fetch(process.env.N8N_WEBHOOK_WHATSAPP!, {
+        await fetch(process.env.N8N_WEBHOOK_WHATSAPP, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -118,21 +114,25 @@ export async function POST(request: NextRequest) {
           }),
         });
       } catch (err) {
-        console.warn("Falha ao enviar WhatsApp:", err);
+        console.warn("Falha ao enviar WhatsApp via N8N:", err);
       }
     }
 
-    // ================= EMAIL =================
-
     try {
       await supabaseAdmin.auth.resetPasswordForEmail(loginEmail, {
-        redirectTo: `${process.env.NEXT_PUBLIC_APP_URL}/primeiro-acesso`,
+        redirectTo,
       });
     } catch (err) {
-      console.warn("Falha ao enviar email:", err);
+      console.warn("Falha ao enviar email de recovery:", err);
     }
 
-    return NextResponse.json({ success: true });
+    return NextResponse.json({
+      success: true,
+      data: {
+        lojistaId: lojista.id,
+        loginEmail,
+      },
+    });
   } catch (error) {
     return NextResponse.json(
       {

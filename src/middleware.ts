@@ -41,13 +41,13 @@ export async function middleware(req: NextRequest) {
 
   const isRootPage = pathname === "/";
   const isAuthPage = pathname.startsWith("/login");
+  const isPrimeiroAcessoRoute = pathname.startsWith("/primeiro-acesso");
   const isAdminRoute = pathname.startsWith("/admin");
   const isLojistaRoute = pathname.startsWith("/lojista");
   const isClienteRoute = pathname.startsWith("/cliente");
-  const isPrimeiroAcessoRoute = pathname.startsWith("/primeiro-acesso");
 
   if (userError || !user) {
-    if (isRootPage || isAdminRoute || isLojistaRoute || isClienteRoute || isPrimeiroAcessoRoute) {
+    if (isRootPage || isAdminRoute || isLojistaRoute || isClienteRoute) {
       return NextResponse.redirect(new URL("/login", req.url));
     }
 
@@ -99,7 +99,6 @@ export async function middleware(req: NextRequest) {
 
   const hasKnownProfile = isAdmin || isLojista || isCliente;
 
-  // usuário autenticado, mas sem perfil válido reconhecido
   if (!hasKnownProfile) {
     if (isAuthPage || isPrimeiroAcessoRoute) {
       return res;
@@ -122,7 +121,11 @@ export async function middleware(req: NextRequest) {
 
     return NextResponse.redirect(new URL(defaultRedirect, req.url));
   }
-  
+
+  if (isPrimeiroAcessoRoute) {
+    return res;
+  }
+
   if (isAdminRoute && !isAdmin) {
     return NextResponse.redirect(new URL(defaultRedirect, req.url));
   }

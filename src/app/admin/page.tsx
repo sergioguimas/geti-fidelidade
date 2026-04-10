@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Building2, Shield, Users } from "lucide-react";
 import { requireAdmin } from "@/lib/admin/auth";
+import { LogoutButton } from "@/components/ui/logout-button";
 
 const items = [
   {
@@ -28,11 +29,17 @@ export default async function AdminHomePage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <div>
-        <h1 className="text-2xl font-semibold text-white">Painel administrativo</h1>
-        <p className="mt-1 text-sm text-zinc-400">
-          Gerencie tenants, clientes globais e administradores da plataforma.
-        </p>
+      <div className="flex items-start justify-between">
+        <div>
+          <h1 className="text-2xl font-semibold text-white">
+            Painel administrativo
+          </h1>
+          <p className="mt-1 text-sm text-zinc-400">
+            Gerencie tenants, clientes globais e administradores da plataforma.
+          </p>
+        </div>
+
+        <LogoutButton />
       </div>
 
       <div className="grid gap-4 md:grid-cols-3">

@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { supabase } from "@/lib/supabase/client";
+import { createClient } from "@/lib/supabase/client";
 
 import { AuthShell } from "@/components/auth/auth-shell";
 import { AuthSkeleton } from "@/components/auth/auth-skeleton";
@@ -85,7 +85,7 @@ export default function LoginPage() {
 
     try {
       const { data: authData, error: signInError } =
-        await supabase.auth.signInWithPassword({
+        await createClient().auth.signInWithPassword({
           email: merchantEmail,
           password: merchantPassword,
         });
@@ -101,14 +101,14 @@ export default function LoginPage() {
         { data: admin, error: adminError },
         { data: vinculoLojista, error: lojistaError },
       ] = await Promise.all([
-        supabase
+        createClient()
           .from("admins_plataforma")
           .select("id, auth_user_id, ativo")
           .eq("auth_user_id", userId)
           .eq("ativo", true)
           .maybeSingle(),
 
-        supabase
+        createClient()
           .from("lojistas_usuarios")
           .select("id, lojista_id")
           .eq("auth_user_id", userId)
@@ -124,7 +124,7 @@ export default function LoginPage() {
       });
 
       if (adminError) {
-        await supabase.auth.signOut();
+        await createClient().auth.signOut();
         setError(`Falha ao validar admin: ${adminError.message}`);
         return;
       }
@@ -136,7 +136,7 @@ export default function LoginPage() {
       }
 
       if (lojistaError) {
-        await supabase.auth.signOut();
+        await createClient().auth.signOut();
         setError(`Falha ao validar lojista: ${lojistaError.message}`);
         return;
       }
@@ -147,7 +147,7 @@ export default function LoginPage() {
         return;
       }
 
-      await supabase.auth.signOut();
+      await createClient().auth.signOut();
       setError("Usuário autenticado, mas sem perfil autorizado.");
     } catch (err) {
       console.error("handleMerchantLogin error", err);
@@ -171,7 +171,7 @@ export default function LoginPage() {
         return;
       }
 
-      const { data: cliente, error: clienteError } = await supabase
+      const { data: cliente, error: clienteError } = await createClient()
         .from("clientes")
         .select("id, email, auth_user_id, pode_fazer_login, documento")
         .eq("documento", normalizedDocumento)
@@ -193,7 +193,7 @@ export default function LoginPage() {
       }
 
       const { data: authData, error: signInError } =
-        await supabase.auth.signInWithPassword({
+        await createClient().auth.signInWithPassword({
           email: cliente.email,
           password: customerPassword,
         });
@@ -206,18 +206,18 @@ export default function LoginPage() {
       const authUserId = authData.user?.id;
 
       if (!authUserId) {
-        await supabase.auth.signOut();
+        await createClient().auth.signOut();
         setError("Não foi possível validar a sessão do cliente.");
         return;
       }
 
       if (cliente.auth_user_id && cliente.auth_user_id !== authUserId) {
-        await supabase.auth.signOut();
+        await createClient().auth.signOut();
         setError("O usuário autenticado não corresponde ao cliente informado.");
         return;
       }
 
-      await supabase
+      await createClient()
         .from("clientes")
         .update({ ultimo_login_em: new Date().toISOString() })
         .eq("id", cliente.id);

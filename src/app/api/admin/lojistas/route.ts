@@ -2,17 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireAdminApi } from "@/lib/admin/api-auth";
 import { createAdminClient } from "@/lib/supabase/admin";
 
-function gerarSenhaTemporaria(length = 14) {
-  const chars =
-    "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#$%";
-  let result = "";
-  for (let i = 0; i < length; i++) {
-    result += chars[Math.floor(Math.random() * chars.length)];
-  }
-  return result;
+function normalizeCnpj(value: string) {
+  return value.replace(/\D/g, "");
 }
 
-function normalizeCnpj(value: string) {
+function normalizePhone(value: string) {
   return value.replace(/\D/g, "");
 }
 
@@ -54,10 +48,13 @@ export async function POST(request: NextRequest) {
     const nomeFantasia = nomeFantasiaInput || razaoSocial;
     const nomeResponsavel = String(body.nomeResponsavel ?? "").trim() || null;
     const telefone = String(body.telefone ?? "").trim() || null;
+    const telefoneNormalizado = telefone ? normalizePhone(telefone) : null;
     const cnpj = normalizeCnpj(String(body.cnpj ?? "").trim());
     const endereco = String(body.endereco ?? "").trim() || null;
     const email = String(body.email ?? "").trim().toLowerCase() || null;
     const loginEmail = String(body.loginEmail ?? "").trim().toLowerCase();
+
+    // ================= VALIDAÇÕES =================
 
     if (!razaoSocial) {
       return NextResponse.json(
@@ -87,6 +84,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // ================= DUPLICIDADE =================
+
     const { data: existentePorCnpj, error: cnpjError } = await supabaseAdmin
       .from("lojistas")
       .select("id, razao_social, nome_fantasia, cnpj")
@@ -104,26 +103,20 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         {
           error:
-            "Já existe um lojista cadastrado com este CNPJ. Revise o cadastro existente e, se necessário, edite-o em vez de criar outro.",
+            "Já existe um lojista cadastrado com este CNPJ.",
           code: "LOJISTA_CNPJ_DUPLICADO",
-          data: {
-            id: existentePorCnpj.id,
-            razaoSocial: existentePorCnpj.razao_social,
-            nomeFantasia: existentePorCnpj.nome_fantasia,
-            cnpj: existentePorCnpj.cnpj,
-          },
+          data: existentePorCnpj,
         },
         { status: 409 }
       );
     }
 
-    const senhaTemporaria = gerarSenhaTemporaria();
+    // ================= CRIAR USUÁRIO =================
 
     const { data: createdUser, error: createUserError } =
       await supabaseAdmin.auth.admin.createUser({
         email: loginEmail,
-        password: senhaTemporaria,
-        email_confirm: false,
+        email_confirm: true,
         user_metadata: {
           tipo: "lojista_owner",
           nome: nomeResponsavel ?? razaoSocial,
@@ -134,13 +127,16 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         {
           error:
-            createUserError?.message || "Erro ao criar usuário de autenticação do lojista.",
+            createUserError?.message ||
+            "Erro ao criar usuário de autenticação.",
         },
         { status: 500 }
       );
     }
 
     const authUserId = createdUser.user.id;
+
+    // ================= CRIAR LOJISTA =================
 
     const { data: lojista, error: lojistaError } = await supabaseAdmin
       .from("lojistas")
@@ -154,25 +150,19 @@ export async function POST(request: NextRequest) {
         email,
         ativo: true,
       })
-      .select(
-        "id, nome_fantasia, razao_social, nome_responsavel, telefone, cnpj, endereco, email, ativo, created_at"
-      )
+      .select("*")
       .single();
 
     if (lojistaError || !lojista) {
       await supabaseAdmin.auth.admin.deleteUser(authUserId);
 
-      const message =
-        lojistaError?.message?.toLowerCase().includes("uq_lojistas_cnpj") ||
-        lojistaError?.message?.toLowerCase().includes("duplicate key")
-          ? "Já existe um lojista cadastrado com este CNPJ. Revise o cadastro existente e, se necessário, edite-o em vez de criar outro."
-          : lojistaError?.message || "Erro ao criar lojista.";
-
       return NextResponse.json(
-        { error: message },
+        { error: lojistaError?.message || "Erro ao criar lojista." },
         { status: 500 }
       );
     }
+
+    // ================= VÍNCULO =================
 
     const { error: vinculoError } = await supabaseAdmin
       .from("lojistas_usuarios")
@@ -187,16 +177,64 @@ export async function POST(request: NextRequest) {
       await supabaseAdmin.auth.admin.deleteUser(authUserId);
 
       return NextResponse.json(
-        { error: vinculoError.message || "Erro ao vincular owner ao lojista." },
+        { error: vinculoError.message },
         { status: 500 }
       );
     }
 
-    const redirectTo = `${process.env.NEXT_PUBLIC_APP_URL ?? ""}/login`;
+    // ================= LINK PRIMEIRO ACESSO =================
 
-    await supabaseAdmin.auth.resetPasswordForEmail(loginEmail, {
-      redirectTo,
-    });
+    const { data: linkData, error: linkError } =
+      await supabaseAdmin.auth.admin.generateLink({
+        type: "recovery",
+        email: loginEmail,
+      });
+
+    if (linkError) {
+      console.error("Erro ao gerar link:", linkError);
+    }
+
+    const actionLink = linkData?.properties?.action_link;
+
+    // ================= WHATSAPP (N8N) =================
+
+    if (telefoneNormalizado && actionLink) {
+      const mensagem = `Olá ${nomeResponsavel ?? nomeFantasia}! 👋
+
+      Sua conta foi criada no sistema de fidelidade.
+
+      Para acessar pela primeira vez e definir sua senha:
+      👉 ${actionLink}
+
+      Se não foi você, ignore esta mensagem.`;
+
+      try {
+        await fetch(process.env.N8N_WEBHOOK_WHATSAPP!, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            telefone: telefoneNormalizado,
+            mensagem,
+          }),
+        });
+      } catch (err) {
+        console.warn("Falha ao enviar WhatsApp via N8N:", err);
+      }
+    }
+
+    // ================= EMAIL (fallback opcional) =================
+
+    try {
+      await supabaseAdmin.auth.resetPasswordForEmail(loginEmail, {
+        redirectTo: `${process.env.NEXT_PUBLIC_APP_URL}/primeiro-acesso`,
+      });
+    } catch (err) {
+      console.warn("Falha ao enviar email:", err);
+    }
+
+    // ================= RESPONSE =================
 
     return NextResponse.json(
       {
@@ -212,7 +250,12 @@ export async function POST(request: NextRequest) {
     );
   } catch (error) {
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Erro ao criar lojista." },
+      {
+        error:
+          error instanceof Error
+            ? error.message
+            : "Erro ao criar lojista.",
+      },
       { status: 500 }
     );
   }

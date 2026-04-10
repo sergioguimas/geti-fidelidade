@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { supabase } from "@/lib/supabase/client";
+import { createClient } from "@/lib/supabase/client";
 
 export default function PerfilPage() {
   const [email, setEmail] = useState<string | null>(null);
@@ -11,7 +11,7 @@ export default function PerfilPage() {
     async function loadUser() {
       const {
         data: { user },
-      } = await supabase.auth.getUser();
+      } = await createClient().auth.getUser();
 
       setEmail(user?.email ?? null);
       setCreatedAt(user?.created_at ?? null);

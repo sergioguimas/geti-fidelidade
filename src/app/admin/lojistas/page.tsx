@@ -14,6 +14,8 @@ export type AdminLojistaItem = {
   created_at: string | null;
 };
 
+
+
 export default async function AdminLojistasRoutePage() {
   const { supabase } = await requireAdmin();
 

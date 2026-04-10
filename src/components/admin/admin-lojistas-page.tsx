@@ -68,6 +68,24 @@ export function AdminLojistasPage({ initialLojistas }: Props) {
       setLoadingId(null);
     }
   }
+  
+  async function handleReenviarConvite(lojistaId: string) {
+    try {
+      const res = await fetch("/api/admin/lojistas/reenviar-convite", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ lojistaId }),
+      });
+
+      if (!res.ok) throw new Error();
+
+      alert("Convite reenviado com sucesso!");
+    } catch {
+      alert("Erro ao reenviar convite.");
+    }
+  }
 
   function handleCreated(lojista: AdminLojistaItem) {
     setLojistas((current) => [lojista, ...current]);
@@ -166,6 +184,12 @@ export function AdminLojistasPage({ initialLojistas }: Props) {
                         : lojista.ativo
                         ? "Bloquear"
                         : "Ativar"}
+                    </button>
+                    <button
+                      onClick={() => handleReenviarConvite(lojista.id)}
+                      className="text-sm text-blue-500 hover:underline"
+                    >
+                      Reenviar convite
                     </button>
                   </td>
                 </tr>

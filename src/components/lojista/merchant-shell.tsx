@@ -19,7 +19,7 @@ import {
   Users,
   X,
 } from "lucide-react";
-import { supabase } from "@/lib/supabase/client";
+import { createClient } from "@/lib/supabase/client";
 
 type MerchantShellProps = {
   children: ReactNode;
@@ -346,7 +346,7 @@ export function MerchantShell({ children }: MerchantShellProps) {
     async function loadUser() {
       const {
         data: { user },
-      } = await supabase.auth.getUser();
+      } = await createClient().auth.getUser();
 
       setUserEmail(user?.email ?? null);
     }
@@ -357,7 +357,7 @@ export function MerchantShell({ children }: MerchantShellProps) {
   async function handleLogout() {
     setLoggingOut(true);
 
-    await supabase.auth.signOut();
+    await createClient().auth.signOut();
     router.replace("/login");
     router.refresh();
 

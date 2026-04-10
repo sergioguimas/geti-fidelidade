@@ -8,7 +8,7 @@ import {
   Clock3,
   ChevronRight,
 } from "lucide-react";
-import { supabase } from "@/lib/supabase/client";
+import { createClient } from "@/lib/supabase/client";
 import { authFetch } from "@/lib/api";
 
 type CustomerDashboardData = {
@@ -210,7 +210,7 @@ export default function ClienteDashboardPage() {
     try {
       const {
         data: { user },
-      } = await supabase.auth.getUser();
+      } = await createClient().auth.getUser();
 
       if (!user) {
         throw new Error("Usuário não autenticado.");

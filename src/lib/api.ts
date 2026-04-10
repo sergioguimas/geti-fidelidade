@@ -1,4 +1,4 @@
-import { supabase } from "@/lib/supabase/client";
+import { createClient } from "@/lib/supabase/client";
 
 export async function authFetch(
   input: RequestInfo | URL,
@@ -6,7 +6,7 @@ export async function authFetch(
 ) {
   const {
     data: { session },
-  } = await supabase.auth.getSession();
+  } = await createClient().auth.getSession();
 
   return fetch(input, {
     ...init,

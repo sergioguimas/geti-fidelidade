@@ -44,9 +44,10 @@ export async function middleware(req: NextRequest) {
   const isAdminRoute = pathname.startsWith("/admin");
   const isLojistaRoute = pathname.startsWith("/lojista");
   const isClienteRoute = pathname.startsWith("/cliente");
+  const isPrimeiroAcessoRoute = pathname.startsWith("/primeiro-acesso");
 
   if (userError || !user) {
-    if (isRootPage || isAdminRoute || isLojistaRoute || isClienteRoute) {
+    if (isRootPage || isAdminRoute || isLojistaRoute || isClienteRoute || isPrimeiroAcessoRoute) {
       return NextResponse.redirect(new URL("/login", req.url));
     }
 
@@ -100,7 +101,7 @@ export async function middleware(req: NextRequest) {
 
   // usuário autenticado, mas sem perfil válido reconhecido
   if (!hasKnownProfile) {
-    if (isAuthPage) {
+    if (isAuthPage || isPrimeiroAcessoRoute) {
       return res;
     }
 
@@ -150,5 +151,12 @@ export async function middleware(req: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/", "/login", "/admin/:path*", "/lojista/:path*", "/cliente/:path*"],
+  matcher: [
+    "/",
+    "/login",
+    "/primeiro-acesso",
+    "/admin/:path*",
+    "/lojista/:path*",
+    "/cliente/:path*",
+  ],
 };

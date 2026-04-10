@@ -69,10 +69,15 @@ export async function POST(request: NextRequest) {
 
     // ================= GERAR LINK =================
 
+    const redirectTo = `${process.env.NEXT_PUBLIC_APP_URL}/primeiro-acesso`;
+
     const { data: linkData, error: linkError } =
       await supabaseAdmin.auth.admin.generateLink({
         type: "recovery",
         email: loginEmail,
+        options: {
+          redirectTo,
+        },
       });
 
     if (linkError) {

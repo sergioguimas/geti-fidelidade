@@ -1,41 +1,169 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# 🎯 Fidelidade — Plataforma de Loyalty Multi-Tenant
 
-## Getting Started
+![Status](https://img.shields.io/badge/status-beta-yellow)
+![Architecture](https://img.shields.io/badge/architecture-multi--tenant-blue)
+![Stack](https://img.shields.io/badge/stack-Next.js%20%7C%20Supabase%20%7C%20PostgreSQL-0ea5e9)
+![License](https://img.shields.io/badge/license-MIT-green)
 
-First, run the development server:
+Sistema completo de fidelização de clientes com **engine avançada de pontos**, projetado para escalar como **SaaS multi-tenant**.
+
+---
+
+## ✨ Sobre o Projeto
+
+O **Fidelidade** é uma plataforma que permite que empresas criem e gerenciem seus próprios programas de fidelidade, com regras altamente configuráveis e um sistema robusto de controle de pontos.
+
+Diferente de soluções simples, o sistema foi construído com foco em:
+
+- precisão de cálculo  
+- consistência de dados  
+- escalabilidade  
+- flexibilidade para diferentes nichos  
+
+---
+
+## 🧠 Diferenciais Técnicos
+
+- 🔥 Cálculo de pontos por item (não apenas total da compra)  
+- 🧩 Engine baseada em lotes  
+- ⏳ Expiração automática de pontos  
+- 🔄 Consumo FIFO real  
+- ⚖️ Compensação inteligente em cancelamentos  
+- 🏢 Arquitetura multi-tenant nativa  
+- 🔐 Segurança via RLS (Row Level Security)  
+
+---
+
+## 🚀 Features
+
+### 👨‍💼 Lojista
+- Gestão de clientes  
+- Registro de compras com múltiplos itens  
+- Cadastro e controle de produtos  
+- Configuração de programas de fidelidade  
+- Dashboard com métricas  
+- Importação de produtos via CSV  
+
+### 👤 Cliente
+- Cadastro global  
+- Pontos por lojista  
+- Participação em múltiplos programas  
+- Histórico de pontos  
+
+### ⚙️ Sistema de Pontos
+
+- Baseado em produto + nível  
+- Controle por lotes:
+  - pendente  
+  - disponivel  
+  - expirado  
+  - cancelado  
+- FIFO para consumo  
+- Expiração automática  
+- Compensação em cancelamentos  
+
+---
+
+## 🧱 Arquitetura
+
+- Frontend (Next.js)
+    ↓
+- Supabase (Auth + RLS)
+    ↓
+- PostgreSQL (Funções + Triggers)
+
+---
+
+## 🗃️ Modelagem (Core)
+
+- lojistas
+- clientes
+- clientes_fidelidade
+- produtos
+- compras
+- compra_itens
+- lotes_pontos
+- pontos_movimentacoes
+- programas_fidelidade
+- programa_niveis
+- admins_plataforma
+
+---
+
+## 🔄 Fluxo de Pontuação
+
+1. Compra criada  
+2. Itens processados individualmente  
+3. Sistema calcula pontos  
+4. Geração de lotes  
+5. Atualização de saldo  
+6. Eventos:
+   - consumo (FIFO)  
+   - expiração  
+   - cancelamento com compensação  
+
+---
+
+## 📦 Importação CSV
+
+Formato:
+descricao;tetoPercentual;ativo
+
+Fluxo:
+Upload → Validação → Deduplicação → Preview → Confirmação
+
+
+---
+
+## 📊 Dashboard
+
+- Clientes ativos  
+- Vendas por período  
+- Pontos gerados vs utilizados  
+- Distribuição por níveis  
+- Top clientes  
+- Últimas movimentações  
+
+---
+
+## 🛠️ Stack
+
+### Frontend
+- Next.js (App Router)  
+- TypeScript  
+- Tailwind CSS v4  
+- shadcn/ui  
+
+### Backend / Infra
+- Supabase (Auth + DB + RLS)  
+- PostgreSQL  
+- PL/pgSQL  
+
+---
+
+## 🚀 Como rodar o projeto
+
+### 1. Clone
+
+```bash
+git clone https://github.com/seu-usuario/fidelidade.git
+cd fidelidade
+
+### 2. Instale
+
+```bash
+npm install
+
+### 3. Configure variáveis
+
+```env
+NEXT_PUBLIC_APP_URL=
+NEXT_PUBLIC_SUPABASE_URL=
+NEXT_PUBLIC_SUPABASE_ANON_KEY=
+SUPABASE_SERVICE_ROLE_KEY=
+N8N_WEBHOOK_WHATSAPP=
+
+### 4. Rode
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
-
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
-
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
-
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
-
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
-
-
-## Ativar Cronjob:
-crontab -e
-10 2 * * * curl -X POST https://seu-dominio.com/api/internal/expirar-lotes -H "Authorization: Bearer SUA_CHAVE_AQUI" >/dev/null 2>&1

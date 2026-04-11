@@ -18,6 +18,10 @@ export type AdminClienteItem = {
       razao_social: string | null;
     }>;
   }>;
+
+  // Preparação para evoluções futuras
+  pode_fazer_login?: boolean | null;
+  ativado_em?: string | null;
 };
 
 export default async function AdminClientesRoutePage() {
@@ -46,6 +50,7 @@ export default async function AdminClientesRoutePage() {
     .order("created_at", { ascending: false });
 
   if (error) {
+    console.error(error);
     throw new Error("Erro ao carregar clientes.");
   }
 

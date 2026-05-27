@@ -9,6 +9,7 @@ export type CompraFormInitialItem = {
   produtoId: string;
   quantidade: number;
   valorUnitario: number;
+  desconto?: number;
 };
 
 export type CompraFormInitialData = {
@@ -31,6 +32,7 @@ type ItemForm = {
   produtoId: string;
   quantidade: string;
   valorUnitario: string;
+  desconto: string;
 };
 
 function formatCurrency(value: number) {
@@ -46,6 +48,7 @@ function createEmptyItem(): ItemForm {
     produtoId: "",
     quantidade: "1",
     valorUnitario: "",
+    desconto: "",
   };
 }
 
@@ -255,6 +258,10 @@ export function CompraForm({
             item.valorUnitario != null && Number.isFinite(item.valorUnitario)
               ? String(item.valorUnitario)
               : "",
+          desconto:
+            item.desconto != null && Number.isFinite(item.desconto)
+              ? String(item.desconto)
+              : "",
         }))
       );
     } else {
@@ -271,17 +278,23 @@ export function CompraForm({
     return itens.reduce((acc, item) => {
       const quantidade = Number(item.quantidade);
       const valorUnitario = Number(item.valorUnitario);
+      const desconto = Number(item.desconto || 0);
 
       if (
         Number.isNaN(quantidade) ||
         quantidade <= 0 ||
         Number.isNaN(valorUnitario) ||
-        valorUnitario <= 0
+        valorUnitario <= 0 ||
+        Number.isNaN(desconto) ||
+        desconto < 0
       ) {
         return acc;
       }
 
-      return acc + quantidade * valorUnitario;
+      const subtotalBruto = quantidade * valorUnitario;
+      const subtotalLiquido = Math.max(subtotalBruto - desconto, 0);
+
+      return acc + subtotalLiquido;
     }, 0);
   }, [itens]);
 
@@ -323,6 +336,7 @@ export function CompraForm({
       const normalizedItens = itens.map((item, index) => {
         const quantidadeNumber = Number(item.quantidade);
         const valorUnitarioNumber = Number(item.valorUnitario);
+        const descontoNumber = Number(item.desconto || 0);
 
         if (!item.produtoId) {
           throw new Error(`Selecione o produto do item ${index + 1}.`);
@@ -346,10 +360,23 @@ export function CompraForm({
           );
         }
 
+        const subtotalBruto = quantidadeNumber * valorUnitarioNumber;
+
+        if (
+          Number.isNaN(descontoNumber) ||
+          descontoNumber < 0 ||
+          descontoNumber > subtotalBruto
+        ) {
+          throw new Error(
+            `Informe um desconto válido no item ${index + 1}.`
+          );
+        }
+
         return {
           produtoId: item.produtoId,
           quantidade: quantidadeNumber,
           valorUnitario: valorUnitarioNumber,
+          desconto: descontoNumber,
         };
       });
 
@@ -494,8 +521,9 @@ export function CompraForm({
               (produto) => produto.id === item.produtoId
             );
 
-            const subtotal =
-              Number(item.quantidade || 0) * Number(item.valorUnitario || 0);
+            const subtotalBruto = Number(item.quantidade || 0) * Number(item.valorUnitario || 0);
+            const desconto = Number(item.desconto || 0);
+            const subtotal = Math.max(subtotalBruto - desconto, 0);
 
             return (
               <div
@@ -542,7 +570,7 @@ export function CompraForm({
                     }}
                     getOptionValue={(produto) => produto.id}
                     getOptionLabel={(produto) => produto.descricao}
-                    className="md:col-span-6"
+                    className="md:col-span-4"
                   />
 
                   <div className="md:col-span-2">
@@ -579,6 +607,24 @@ export function CompraForm({
                       placeholder="0,00"
                       className="w-full rounded-xl border border-zinc-200 bg-white px-3 py-2.5 text-sm outline-none placeholder:text-zinc-400 focus:border-zinc-400"
                       required
+                    />
+                  </div>
+                  
+                  <div className="md:col-span-2">
+                    <label className="mb-1.5 block text-sm font-medium text-zinc-800">
+                      Desconto
+                    </label>
+
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      value={item.desconto}
+                      onChange={(e) =>
+                        updateItem(item.id, { desconto: e.target.value })
+                      }
+                      placeholder="0,00"
+                      className="w-full rounded-xl border border-zinc-200 bg-white px-3 py-2.5 text-sm outline-none placeholder:text-zinc-400 focus:border-zinc-400"
                     />
                   </div>
 

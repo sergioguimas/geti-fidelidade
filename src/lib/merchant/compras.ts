@@ -46,7 +46,20 @@ function buildCompraItens(
       throw new Error("Valor unitário inválido.");
     }
 
-    const subtotal = round2(item.quantidade * item.valorUnitario);
+    const quantidade = Number(item.quantidade);
+    const valorUnitario = round2(Number(item.valorUnitario));
+    const subtotalBruto = round2(quantidade * valorUnitario);
+    const desconto = round2(Number(item.desconto ?? 0));
+
+    if (Number.isNaN(desconto) || desconto < 0) {
+      throw new Error("Desconto inválido.");
+    }
+
+    if (desconto > subtotalBruto) {
+      throw new Error("O desconto não pode ser maior que o subtotal do item.");
+    }
+
+    const subtotal = round2(subtotalBruto - desconto);
 
     const tetoPercentualProduto = Number(produto.teto_percentual);
     const tetoPercentualNivel = Number(produto.teto_percentual);
@@ -60,8 +73,10 @@ function buildCompraItens(
     return {
       produto_id: produto.id,
       descricao_produto: produto.descricao,
-      quantidade: item.quantidade,
-      valor_unitario: round2(item.valorUnitario),
+      quantidade,
+      valor_unitario: valorUnitario,
+      subtotal_bruto: subtotalBruto,
+      desconto,
       subtotal,
       teto_percentual_produto: tetoPercentualProduto,
       teto_percentual_nivel: tetoPercentualNivel,
@@ -101,6 +116,8 @@ export async function listCompras(
       descricao_produto,
       quantidade,
       valor_unitario,
+      subtotal_bruto,
+      desconto,
       subtotal,
       percentual_aplicado,
       pontos_gerados
@@ -175,6 +192,8 @@ export async function listCompras(
       ...ci,
       quantidade: Number(ci.quantidade),
       valor_unitario: Number(ci.valor_unitario),
+      subtotal_bruto: Number(ci.subtotal_bruto ?? 0),
+      desconto: Number(ci.desconto ?? 0),
       subtotal: Number(ci.subtotal),
       percentual_aplicado: Number(ci.percentual_aplicado),
       pontos_gerados: Number(ci.pontos_gerados),

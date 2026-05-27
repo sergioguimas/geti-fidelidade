@@ -148,11 +148,13 @@ Upload → Validação → Deduplicação → Preview → Confirmação
 ```bash
 git clone https://github.com/seu-usuario/fidelidade.git
 cd fidelidade
+```
 
 ### 2. Instale
 
 ```bash
 npm install
+```
 
 ### 3. Configure variáveis
 
@@ -162,8 +164,10 @@ NEXT_PUBLIC_SUPABASE_URL=
 NEXT_PUBLIC_SUPABASE_ANON_KEY=
 SUPABASE_SERVICE_ROLE_KEY=
 N8N_WEBHOOK_WHATSAPP=
+```
 
 ### 4. Rode
 
 ```bash
 npm run dev
+```

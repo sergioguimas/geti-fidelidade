@@ -77,6 +77,8 @@ export type CompraItemListItem = {
   descricao_produto: string;
   quantidade: number;
   valor_unitario: number;
+  subtotal_bruto: number;
+  desconto: number;
   subtotal: number;
   percentual_aplicado: number;
   pontos_gerados: number;
@@ -130,6 +132,7 @@ export type CompraItemInput = {
   produtoId: string;
   quantidade: number;
   valorUnitario: number;
+  desconto?: number;
 };
 
 export type CompraCreateInput = {
@@ -236,7 +239,10 @@ export type PremioUpdateInput = {
   ativo?: boolean;
 };
 
-export type DashboardRange = "7d" | "30d" | "90d";
+export type DashboardPeriod = {
+  dataInicio: string;
+  dataFim: string;
+};
 
 export type DashboardSummary = {
   clientes_total: number;

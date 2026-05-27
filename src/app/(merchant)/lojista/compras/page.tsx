@@ -312,6 +312,7 @@ export default function ComprasPage() {
                         produtoId: item.produto_id,
                         quantidade: item.quantidade,
                         valorUnitario: item.valor_unitario,
+                        desconto: item.desconto ?? 0,
                       })),
                     }
                   : null

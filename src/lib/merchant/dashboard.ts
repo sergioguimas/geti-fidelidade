@@ -2,33 +2,46 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type {
   DashboardData,
   DashboardNivelDistribuicao,
-  DashboardRange,
+  DashboardPeriod,
   DashboardSolicitacao,
   DashboardSummary,
   DashboardTopCliente,
 } from "@/lib/types";
 
-function getRangeDays(range: DashboardRange) {
-  if (range === "7d") return 7;
-  if (range === "30d") return 30;
-  return 90;
+function addDaysToDateOnly(dateOnly: string, days: number) {
+  const date = new Date(`${dateOnly}T00:00:00.000Z`);
+  date.setUTCDate(date.getUTCDate() + days);
+  return date.toISOString().slice(0, 10);
 }
 
-function getPeriodBounds(range: DashboardRange) {
-  const now = new Date();
-  const days = getRangeDays(range);
+function diffDaysInclusive(dataInicio: string, dataFim: string) {
+  const start = new Date(`${dataInicio}T00:00:00.000Z`);
+  const end = new Date(`${dataFim}T00:00:00.000Z`);
 
-  const currentStart = new Date(now);
-  currentStart.setDate(now.getDate() - days);
+  const diffMs = end.getTime() - start.getTime();
+  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
 
-  const previousEnd = new Date(currentStart);
-  const previousStart = new Date(currentStart);
-  previousStart.setDate(currentStart.getDate() - days);
+  return Math.max(diffDays + 1, 1);
+}
+
+function toSaoPauloStartOfDay(dateOnly: string) {
+  return `${dateOnly}T00:00:00.000-03:00`;
+}
+
+function getPeriodBounds(period: DashboardPeriod) {
+  const days = diffDaysInclusive(period.dataInicio, period.dataFim);
+
+  const currentStartDate = period.dataInicio;
+  const currentEndExclusiveDate = addDaysToDateOnly(period.dataFim, 1);
+
+  const previousEndExclusiveDate = currentStartDate;
+  const previousStartDate = addDaysToDateOnly(currentStartDate, -days);
 
   return {
-    currentStart: currentStart.toISOString(),
-    previousStart: previousStart.toISOString(),
-    previousEnd: previousEnd.toISOString(),
+    currentStart: toSaoPauloStartOfDay(currentStartDate),
+    currentEnd: toSaoPauloStartOfDay(currentEndExclusiveDate),
+    previousStart: toSaoPauloStartOfDay(previousStartDate),
+    previousEnd: toSaoPauloStartOfDay(previousEndExclusiveDate),
   };
 }
 
@@ -72,9 +85,10 @@ function sumCompraSubtotal(compraItens: any[] | null | undefined) {
 export async function getDashboardData(
   supabase: SupabaseClient,
   lojistaId: string,
-  range: DashboardRange
+  period: DashboardPeriod
 ): Promise<DashboardData> {
-  const { currentStart, previousStart, previousEnd } = getPeriodBounds(range);
+  const { currentStart, currentEnd, previousStart, previousEnd } =
+    getPeriodBounds(period);
 
   const [
     clientesResp,
@@ -116,7 +130,8 @@ export async function getDashboardData(
         )
       `)
       .eq("lojista_id", lojistaId)
-      .gte("data_compra", currentStart),
+      .gte("data_compra", currentStart)
+      .lt("data_compra", currentEnd),
 
     supabase
       .from("compras")
@@ -138,7 +153,8 @@ export async function getDashboardData(
       .from("clientes_fidelidade")
       .select("cliente_id", { count: "exact", head: true })
       .eq("lojista_id", lojistaId)
-      .gte("updated_at", currentStart),
+      .gte("updated_at", currentStart)
+      .lt("updated_at", currentEnd),
 
     supabase
       .from("clientes_fidelidade")
@@ -151,7 +167,8 @@ export async function getDashboardData(
       .from("resgates")
       .select("id", { count: "exact", head: true })
       .eq("lojista_id", lojistaId)
-      .gte("solicitado_em", currentStart),
+      .gte("solicitado_em", currentStart)
+      .lt("solicitado_em", currentEnd),
 
     supabase
       .from("resgates")
@@ -171,19 +188,25 @@ export async function getDashboardData(
           nome
         )
       `)
-      .eq("lojista_id", lojistaId),
+      .eq("lojista_id", lojistaId)
+      .gte("updated_at", currentStart)
+      .lt("updated_at", currentEnd),
 
     supabase
       .from("resgates")
       .select("id", { count: "exact", head: true })
       .eq("lojista_id", lojistaId)
-      .eq("status", "pendente"),
+      .eq("status", "pendente")
+      .gte("solicitado_em", currentStart)
+      .lt("solicitado_em", currentEnd),
 
     supabase
       .from("premios")
       .select("id", { count: "exact", head: true })
       .eq("lojista_id", lojistaId)
-      .eq("ativo", true),
+      .eq("ativo", true)
+      .gte("created_at", currentStart)
+      .lt("created_at", currentEnd),
 
     supabase
       .from("compras")
@@ -198,7 +221,8 @@ export async function getDashboardData(
         )
       `)
       .eq("lojista_id", lojistaId)
-      .gte("data_compra", currentStart),
+      .gte("data_compra", currentStart)
+      .lt("data_compra", currentEnd),
 
     supabase
       .from("clientes_fidelidade")
@@ -209,7 +233,9 @@ export async function getDashboardData(
           nome
         )
       `)
-      .eq("lojista_id", lojistaId),
+      .eq("lojista_id", lojistaId)
+      .gte("updated_at", currentStart)
+      .lt("updated_at", currentEnd),
 
     supabase
       .from("resgates")
@@ -227,6 +253,8 @@ export async function getDashboardData(
         )
       `)
       .eq("lojista_id", lojistaId)
+      .gte("solicitado_em", currentStart)
+      .lt("solicitado_em", currentEnd)
       .order("solicitado_em", { ascending: false })
       .limit(8),
   ]);

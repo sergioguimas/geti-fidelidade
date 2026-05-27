@@ -9,12 +9,10 @@ import {
 } from "lucide-react";
 import type {
   DashboardData,
-  DashboardRange,
   DashboardSolicitacao,
   DashboardTopCliente,
 } from "@/lib/types";
 import { StatusBadge } from "@/components/ui/status-badge";
-import { RangeSliderDrag } from "@/components/lojista/range-slider";
 import { authFetch } from "@/lib/api";
 
 function formatCurrency(value: number) {
@@ -146,8 +144,8 @@ function DonutChartSkeleton({
         <p className="mt-1 text-sm text-zinc-500">{description}</p>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-[220px_1fr] lg:items-center">
-        <div className="flex justify-center">
+      <div className="grid min-w-0 gap-6 xl:grid-cols-[210px_minmax(0,1fr)] xl:items-center">
+        <div className="flex min-w-0 justify-center">
           <div className="skeleton relative h-44 w-44 rounded-full">
             <div className="absolute inset-[18px] rounded-full bg-white/60" />
           </div>
@@ -277,12 +275,14 @@ function DonutChartCard({
   description,
   items,
   total,
+  centerLabel = "Total",
   valueFormatter,
 }: {
   title: string;
   description: string;
   items: { label: string; value: number }[];
   total: number;
+  centerLabel?: string;
   valueFormatter?: (value: number) => string;
 }) {
   const safeTotal = total > 0 ? total : 0;
@@ -322,15 +322,15 @@ function DonutChartCard({
         <div className="grid gap-2 lg:grid-cols-[220px_1fr] lg:items-center">
           <div className="flex justify-center">
             <div
-              className="relative h-44 w-44 rounded-full"
+              className="relative h-40 w-40 shrink-0 rounded-full sm:h-44 sm:w-44"
               style={{ background }}
             >
               <div className="absolute inset-5 flex items-center justify-center rounded-full bg-white">
                 <div className="text-center">
                   <p className="text-xs uppercase tracking-wide text-zinc-500">
-                    Total
+                    {centerLabel}
                   </p>
-                  <p className="mt-1 text-1xl font-semibold text-zinc-900">
+                  <p className="mt-1 text-sm font-semibold text-zinc-900 sm:text-base">
                     {valueFormatter ? valueFormatter(safeTotal) : safeTotal}
                   </p>
                 </div>
@@ -338,14 +338,14 @@ function DonutChartCard({
             </div>
           </div>
 
-          <div className="space-y-3">
+          <div className="min-w-0 space-y-3">
             {segments.map((item) => {
               const percent = safeTotal > 0 ? (item.value / safeTotal) * 100 : 0;
 
               return (
                 <div
                   key={item.label}
-                  className="flex items-center justify-between gap-2 rounded-xl bg-blue-100 px-3 py-3 border"
+                  className="flex min-w-0 items-center justify-between gap-3 rounded-xl border bg-blue-100 px-3 py-3"
                 >
                   <div className="flex min-w-0 items-center gap-1">
                     <span
@@ -357,7 +357,7 @@ function DonutChartCard({
                     </span>
                   </div>
 
-                  <div className="text-center">
+                  <div className="shrink-0 text-right">
                     <p className="text-sm font-semibold text-zinc-900">
                       {valueFormatter ? valueFormatter(item.value) : item.value}
                     </p>
@@ -375,19 +375,43 @@ function DonutChartCard({
   );
 }
 
+function getDateOnly(date: Date) {
+  return date.toISOString().slice(0, 10);
+}
+
+function getDefaultDashboardPeriod() {
+  const hoje = new Date();
+
+  const inicio = new Date(hoje);
+  inicio.setDate(inicio.getDate() - 30);
+
+  return {
+    dataInicio: getDateOnly(inicio),
+    dataFim: getDateOnly(hoje),
+  };
+}
+
 export default function LojistaDashboardPage() {
-  const [range, setRange] = useState<DashboardRange>("30d");
+  const defaultPeriod = useMemo(() => getDefaultDashboardPeriod(), []);
+  const [dataInicio, setDataInicio] = useState(defaultPeriod.dataInicio);
+  const [dataFim, setDataFim] = useState(defaultPeriod.dataFim);
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const queryString = useMemo(() => {
-    const params = new URLSearchParams({
-      range,
-    });
+  const params = new URLSearchParams();
+
+  if (dataInicio) {
+      params.set("dataInicio", dataInicio);
+    }
+
+    if (dataFim) {
+      params.set("dataFim", dataFim);
+    }
 
     return params.toString();
-  }, [range]);
+  }, [dataInicio, dataFim]);
 
   async function loadDashboard() {
     setLoading(true);
@@ -436,7 +460,44 @@ export default function LojistaDashboardPage() {
         </div>
 
         <div className="flex flex-wrap gap-2">
-            <RangeSliderDrag value={range} onChange={setRange} />
+            <div className="flex flex-col gap-3 rounded-2xl border border-zinc-200 bg-white/80 p-3 shadow-sm backdrop-blur sm:flex-row sm:items-end">
+            <div>
+              <label className="mb-1 block text-xs font-medium text-zinc-500">
+                Data inicial
+              </label>
+              <input
+                type="date"
+                value={dataInicio}
+                onChange={(event) => setDataInicio(event.target.value)}
+                max={dataFim || undefined}
+                className="w-full rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 outline-none transition focus:border-zinc-400"
+              />
+            </div>
+
+            <div>
+              <label className="mb-1 block text-xs font-medium text-zinc-500">
+                Data final
+              </label>
+              <input
+                type="date"
+                value={dataFim}
+                onChange={(event) => setDataFim(event.target.value)}
+                min={dataInicio || undefined}
+                className="w-full rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 outline-none transition focus:border-zinc-400"
+              />
+            </div>
+
+            <button
+              type="button"
+              onClick={() => {
+                setDataInicio(defaultPeriod.dataInicio);
+                setDataFim(defaultPeriod.dataFim);
+              }}
+              className="rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm font-medium text-zinc-700 transition hover:bg-zinc-100"
+            >
+              Últimos 30 dias
+            </button>
+          </div>
         </div>
       </section>
 
@@ -590,7 +651,7 @@ export default function LojistaDashboardPage() {
           <>
             <DonutChartCard
               title="Maiores clientes no período"
-              description="Participação dos clientes com maior volume de compras."
+              description="Participação dos 5 clientes com maior volume de compras no período."
               items={(data?.top_clientes ?? []).map((item) => ({
                 label: item.nome,
                 value: item.total_gasto,
@@ -599,6 +660,7 @@ export default function LojistaDashboardPage() {
                 (sum, item) => sum + item.total_gasto,
                 0
               )}
+              centerLabel="Top 5"
               valueFormatter={formatCurrency}
             />
 

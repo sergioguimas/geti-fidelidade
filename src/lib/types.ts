@@ -88,6 +88,8 @@ export type CompraListItem = {
   id: string;
   lojista_id: string;
   cliente_id: string;
+  subtotal_bruto: number;
+  desconto_total: number;
   valor_total: number;
   pontos_total: number;
   status: string | null;
@@ -140,6 +142,7 @@ export type CompraCreateInput = {
   dataCompra: string;
   origem?: string;
   status?: "pendente" | "aprovada" | "recusada" | "cancelada";
+  descontoTotal?: number;
   itens: CompraItemInput[];
 };
 
@@ -150,6 +153,7 @@ export type CompraUpdateInput = {
   dataCompra: string;
   origem?: string;
   status?: "pendente" | "aprovada" | "recusada" | "cancelada";
+  descontoTotal?: number;
   itens: CompraItemInput[];
 };
 

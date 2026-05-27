@@ -16,6 +16,7 @@ export type CompraFormInitialData = {
   id: string;
   clienteId: string;
   dataCompra: string;
+  descontoTotal?: number;
   itens: CompraFormInitialItem[];
 } | null;
 
@@ -231,6 +232,7 @@ export function CompraForm({
 }: CompraFormProps) {
   const [clienteId, setClienteId] = useState("");
   const [dataCompra, setDataCompra] = useState("");
+  const [descontoTotal, setDescontoTotal] = useState("");
   const [itens, setItens] = useState<ItemForm[]>([createEmptyItem()]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -243,6 +245,12 @@ export function CompraForm({
       initialData?.dataCompra
         ? initialData.dataCompra.slice(0, 10)
         : new Date().toISOString().slice(0, 10)
+    );
+    
+    setDescontoTotal(
+      initialData?.descontoTotal != null && Number.isFinite(initialData.descontoTotal)
+        ? String(initialData.descontoTotal)
+        : ""
     );
 
     if (initialData?.itens?.length) {
@@ -274,29 +282,49 @@ export function CompraForm({
     [clientes, clienteId]
   );
 
-  const totalCompra = useMemo(() => {
-    return itens.reduce((acc, item) => {
+  const totaisCompra = useMemo(() => {
+    const subtotalBruto = itens.reduce((acc, item) => {
       const quantidade = Number(item.quantidade);
       const valorUnitario = Number(item.valorUnitario);
-      const desconto = Number(item.desconto || 0);
 
       if (
         Number.isNaN(quantidade) ||
         quantidade <= 0 ||
         Number.isNaN(valorUnitario) ||
-        valorUnitario <= 0 ||
-        Number.isNaN(desconto) ||
-        desconto < 0
+        valorUnitario <= 0
       ) {
         return acc;
       }
 
-      const subtotalBruto = quantidade * valorUnitario;
-      const subtotalLiquido = Math.max(subtotalBruto - desconto, 0);
-
-      return acc + subtotalLiquido;
+      return acc + quantidade * valorUnitario;
     }, 0);
-  }, [itens]);
+
+    const descontoItens = itens.reduce((acc, item) => {
+      const desconto = Number(item.desconto || 0);
+
+      if (Number.isNaN(desconto) || desconto < 0) {
+        return acc;
+      }
+
+      return acc + desconto;
+    }, 0);
+
+    const descontoTotalNumber = Number(descontoTotal || 0);
+
+    const valorLiquido = Math.max(
+      subtotalBruto - descontoItens - (Number.isNaN(descontoTotalNumber) ? 0 : descontoTotalNumber),
+      0
+    );
+
+    return {
+      subtotalBruto,
+      descontoItens,
+      descontoTotal: Number.isNaN(descontoTotalNumber) ? 0 : descontoTotalNumber,
+      valorLiquido,
+    };
+  }, [itens, descontoTotal]);
+
+  const totalCompra = totaisCompra.valorLiquido;
 
   function updateItem(itemId: string, patch: Partial<ItemForm>) {
     setItens((current) =>
@@ -384,6 +412,36 @@ export function CompraForm({
         throw new Error("Adicione pelo menos um item.");
       }
 
+      const descontoTotalNumber = Number(descontoTotal || 0);
+
+      if (
+        Number.isNaN(descontoTotalNumber) ||
+        descontoTotalNumber < 0
+      ) {
+        throw new Error("Informe um desconto total válido.");
+      }
+
+      const temDescontoIndividual = normalizedItens.some(
+        (item) => Number(item.desconto ?? 0) > 0
+      );
+
+      if (temDescontoIndividual && descontoTotalNumber > 0) {
+        throw new Error(
+          "Use desconto por item ou desconto total da nota, não os dois ao mesmo tempo."
+        );
+      }
+
+      const subtotalBrutoCompra = normalizedItens.reduce(
+        (sum, item) => sum + item.quantidade * item.valorUnitario,
+        0
+      );
+
+      if (descontoTotalNumber > subtotalBrutoCompra) {
+        throw new Error(
+          "O desconto total não pode ser maior que o subtotal da compra."
+        );
+      }
+
       const payload = isEditing
         ? {
             id: initialData?.id,
@@ -391,6 +449,7 @@ export function CompraForm({
             dataCompra,
             origem: "lojista",
             status: "aprovada",
+            descontoTotal: descontoTotalNumber,
             itens: normalizedItens,
           }
         : {
@@ -398,6 +457,7 @@ export function CompraForm({
             dataCompra,
             origem: "lojista",
             status: "aprovada",
+            descontoTotal: descontoTotalNumber,
             itens: normalizedItens,
           };
 
@@ -428,6 +488,7 @@ export function CompraForm({
       setClienteId("");
       setItens([createEmptyItem()]);
       setDataCompra(new Date().toISOString().slice(0, 10));
+      setDescontoTotal("");
 
       await onCreated();
     } catch (err) {
@@ -457,7 +518,7 @@ export function CompraForm({
           </div>
         </div>
 
-        <div className="grid gap-4 md:grid-cols-[1.4fr_0.8fr]">
+        <div className="grid gap-4 md:grid-cols-[1.4fr_0.7fr_0.7fr]">
           <SearchableSelect
             label="Cliente"
             placeholder="Digite para buscar um cliente"
@@ -481,6 +542,26 @@ export function CompraForm({
               className="w-full rounded-xl border border-zinc-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-zinc-400"
               required
             />
+          </div>
+
+          <div>
+            <label className="mb-1.5 block text-sm font-medium text-zinc-800">
+              Desconto total da nota
+            </label>
+
+            <input
+              type="number"
+              step="0.01"
+              min="0"
+              value={descontoTotal}
+              onChange={(e) => setDescontoTotal(e.target.value)}
+              placeholder="0,00"
+              className="w-full rounded-xl border border-zinc-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-zinc-400"
+            />
+
+            <p className="mt-1 text-xs text-zinc-500">
+              Será dividido igualmente entre os itens.
+            </p>
           </div>
         </div>
 

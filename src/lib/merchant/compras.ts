@@ -10,6 +10,14 @@ function round2(value: number) {
   return Math.round(value * 100) / 100;
 }
 
+function toCents(value: number) {
+  return Math.round(round2(value) * 100);
+}
+
+function fromCents(value: number) {
+  return round2(value / 100);
+}
+
 async function loadProdutos(
   supabase: SupabaseClient,
   lojistaId: string,
@@ -86,6 +94,64 @@ function buildCompraItens(
   });
 }
 
+function aplicarDescontoTotalNosItens(
+  itens: ReturnType<typeof buildCompraItens>,
+  descontoTotalInput: number
+) {
+  const descontoTotal = round2(Number(descontoTotalInput ?? 0));
+
+  if (Number.isNaN(descontoTotal) || descontoTotal < 0) {
+    throw new Error("Desconto total inválido.");
+  }
+
+  if (descontoTotal <= 0) {
+    return itens;
+  }
+
+  const temDescontoIndividual = itens.some((item) => item.desconto > 0);
+
+  if (temDescontoIndividual) {
+    throw new Error(
+      "Use desconto por item ou desconto total da nota, não os dois ao mesmo tempo."
+    );
+  }
+
+  const subtotalBruto = round2(
+    itens.reduce((sum, item) => sum + item.subtotal_bruto, 0)
+  );
+
+  if (descontoTotal > subtotalBruto) {
+    throw new Error("O desconto total não pode ser maior que o subtotal da compra.");
+  }
+
+  const totalCents = toCents(descontoTotal);
+  const baseCents = Math.floor(totalCents / itens.length);
+  const restoCents = totalCents % itens.length;
+
+  return itens.map((item, index) => {
+    const descontoRateado = fromCents(
+      baseCents + (index < restoCents ? 1 : 0)
+    );
+
+    if (descontoRateado > item.subtotal_bruto) {
+      throw new Error(
+        "O desconto total dividido igualmente ficou maior que o subtotal de um dos itens."
+      );
+    }
+
+    const subtotal = round2(item.subtotal_bruto - descontoRateado);
+    const pontosGerados = round2((subtotal * item.percentual_aplicado) / 100);
+
+    return {
+      ...item,
+      desconto: descontoRateado,
+      subtotal,
+      pontos_gerados: pontosGerados,
+    };
+  });
+}
+
+
 export async function listCompras(
   supabase: SupabaseClient,
   lojistaId: string,
@@ -97,6 +163,8 @@ export async function listCompras(
     id,
     lojista_id,
     cliente_id,
+    subtotal_bruto,
+    desconto_total,
     valor_total,
     pontos_total,
     status,
@@ -187,6 +255,8 @@ export async function listCompras(
     data_compra: item.data_compra,
     created_at: item.created_at,
     updated_at: item.updated_at ?? null,
+    subtotal_bruto: Number(item.subtotal_bruto ?? 0),
+    desconto_total: Number(item.desconto_total ?? 0),
     cliente,
     compra_itens: (item.compra_itens ?? []).map((ci: any) => ({
       ...ci,
@@ -228,7 +298,18 @@ export async function createCompra(
     input.itens.map((item) => item.produtoId)
   );
 
-  const compraItens = buildCompraItens(produtosMap, input.itens);
+  const compraItensBase = buildCompraItens(produtosMap, input.itens);
+
+  const descontoTotal = round2(Number(input.descontoTotal ?? 0));
+
+  const compraItens = aplicarDescontoTotalNosItens(
+    compraItensBase,
+    descontoTotal
+  );
+
+  const subtotalBruto = round2(
+    compraItens.reduce((sum, item) => sum + item.subtotal_bruto, 0)
+  );
 
   const valorTotal = round2(
     compraItens.reduce((sum, item) => sum + item.subtotal, 0)
@@ -239,6 +320,8 @@ export async function createCompra(
     .insert({
       lojista_id: lojistaId,
       cliente_id: input.clienteId,
+      subtotal_bruto: subtotalBruto,
+      desconto_total: descontoTotal,
       pontos_total: 0,
       valor_total: valorTotal,
       origem: input.origem ?? "lojista",
@@ -246,7 +329,7 @@ export async function createCompra(
       data_compra: input.dataCompra,
     })
     .select(
-      "id, lojista_id, cliente_id, valor_total, pontos_total, status, origem, data_compra, created_at, updated_at"
+      "id, lojista_id, cliente_id, subtotal_bruto, desconto_total, valor_total, pontos_total, status, origem, data_compra, created_at, updated_at"
     )
     .single();
 
@@ -281,7 +364,7 @@ export async function createCompra(
   const { data: compraProcessada, error: compraProcessadaError } = await supabase
     .from("compras")
     .select(
-      "id, lojista_id, cliente_id, valor_total, pontos_total, status, origem, data_compra, created_at, updated_at"
+      "id, lojista_id, cliente_id, subtotal_bruto, desconto_total, valor_total, pontos_total, status, origem, data_compra, created_at, updated_at"
     )
     .eq("id", compra.id)
     .single();
@@ -311,7 +394,18 @@ export async function updateCompra(
     input.itens.map((item) => item.produtoId)
   );
 
-  const compraItens = buildCompraItens(produtosMap, input.itens);
+  const compraItensBase = buildCompraItens(produtosMap, input.itens);
+
+  const descontoTotal = round2(Number(input.descontoTotal ?? 0));
+
+  const compraItens = aplicarDescontoTotalNosItens(
+    compraItensBase,
+    descontoTotal
+  );
+
+  const subtotalBruto = round2(
+    compraItens.reduce((sum, item) => sum + item.subtotal_bruto, 0)
+  );
 
   const valorTotal = round2(
     compraItens.reduce((sum, item) => sum + item.subtotal, 0)
@@ -321,6 +415,8 @@ export async function updateCompra(
     .from("compras")
     .update({
       cliente_id: input.clienteId,
+      subtotal_bruto: subtotalBruto,
+      desconto_total: descontoTotal,
       valor_total: valorTotal,
       pontos_total: 0,
       origem: input.origem ?? "lojista",
@@ -331,7 +427,7 @@ export async function updateCompra(
     .eq("id", input.id)
     .eq("lojista_id", lojistaId)
     .select(
-      "id, lojista_id, cliente_id, valor_total, pontos_total, status, origem, data_compra, created_at, updated_at"
+      "id, lojista_id, cliente_id, subtotal_bruto, desconto_total, valor_total, pontos_total, status, origem, data_compra, created_at, updated_at"
     )
     .single();
 
@@ -373,7 +469,7 @@ export async function updateCompra(
     await supabase
       .from("compras")
       .select(
-        "id, lojista_id, cliente_id, valor_total, pontos_total, status, origem, data_compra, created_at, updated_at"
+        "id, lojista_id, cliente_id, subtotal_bruto, desconto_total, valor_total, pontos_total, status, origem, data_compra, created_at, updated_at"
       )
       .eq("id", input.id)
       .single();

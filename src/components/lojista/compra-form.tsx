@@ -679,8 +679,8 @@ export function CompraForm({
 
                     <input
                       type="number"
-                      step="0.01"
-                      min="0.01"
+                      step="0.0001"
+                      min="0.0001"
                       value={item.valorUnitario}
                       onChange={(e) =>
                         updateItem(item.id, { valorUnitario: e.target.value })
@@ -698,7 +698,7 @@ export function CompraForm({
 
                     <input
                       type="number"
-                      step="0.01"
+                      step="0.0001"
                       min="0"
                       value={item.desconto}
                       onChange={(e) =>

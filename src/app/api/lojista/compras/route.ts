@@ -31,8 +31,28 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ data: preview });
     }
 
-    const compras = await listCompras(supabase, lojistaId, busca);
-    return NextResponse.json({ data: compras });
+    const dataInicio = searchParams.get("dataInicio") ?? undefined;
+    const dataFim = searchParams.get("dataFim") ?? undefined;
+
+    const page = Number(searchParams.get("page") ?? 1);
+    const pageSize = Number(searchParams.get("pageSize") ?? 20);
+
+    if (dataInicio && dataFim && dataInicio > dataFim) {
+      return NextResponse.json(
+        { error: "A data inicial não pode ser posterior à data final." },
+        { status: 400 }
+      );
+    }
+
+    const result = await listCompras(supabase, lojistaId, {
+      busca,
+      dataInicio,
+      dataFim,
+      page,
+      pageSize,
+    });
+
+    return NextResponse.json(result);
   } catch (error) {
     return NextResponse.json(
       {
@@ -61,6 +81,7 @@ export async function POST(request: NextRequest) {
       dataCompra: body.dataCompra,
       origem: body.origem ?? "lojista",
       status: body.status ?? "aprovada",
+      descontoTotal: body.descontoTotal ?? 0,
       itens: body.itens,
     });
 
@@ -95,6 +116,7 @@ export async function PATCH(request: NextRequest) {
       dataCompra: body.dataCompra,
       origem: body.origem ?? "lojista",
       status: body.status ?? "aprovada",
+      descontoTotal: body.descontoTotal ?? 0,
       itens: body.itens,
     });
 

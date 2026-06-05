@@ -4,10 +4,26 @@ import type {
   CompraUpdateInput,
   CompraItemInput,
   CompraCancelamentoPreview,
+  CompraListFilters,
 } from "../types";
 
 function round2(value: number) {
   return Math.round(value * 100) / 100;
+}
+
+function round4(value: number) {
+  return Math.round(value * 10_000) / 10_000;
+}
+
+function addDaysToDateOnly(dateOnly: string, days: number) {
+  const date = new Date(`${dateOnly}T00:00:00.000Z`);
+  date.setUTCDate(date.getUTCDate() + days);
+
+  return date.toISOString().slice(0, 10);
+}
+
+function toSaoPauloStartOfDay(dateOnly: string) {
+  return `${dateOnly}T00:00:00.000-03:00`;
 }
 
 function toCents(value: number) {
@@ -55,7 +71,7 @@ function buildCompraItens(
     }
 
     const quantidade = Number(item.quantidade);
-    const valorUnitario = round2(Number(item.valorUnitario));
+    const valorUnitario = round4(Number(item.valorUnitario));
     const subtotalBruto = round2(quantidade * valorUnitario);
     const desconto = round2(Number(item.desconto ?? 0));
 
@@ -151,136 +167,183 @@ function aplicarDescontoTotalNosItens(
   });
 }
 
-
 export async function listCompras(
   supabase: SupabaseClient,
   lojistaId: string,
-  busca?: string
+  filters: CompraListFilters = {}
 ) {
+  const page = Math.max(1, Math.trunc(filters.page ?? 1));
+  const pageSize = Math.min(
+    Math.max(1, Math.trunc(filters.pageSize ?? 20)),
+    100
+  );
+
+  const from = (page - 1) * pageSize;
+  const to = from + pageSize - 1;
+
+  const busca = filters.busca?.trim();
+
+  const clienteRelation = busca ? "clientes!inner" : "clientes";
+
   let query = supabase
-  .from("compras")
-  .select(`
-    id,
-    lojista_id,
-    cliente_id,
-    subtotal_bruto,
-    desconto_total,
-    valor_total,
-    pontos_total,
-    status,
-    origem,
-    data_compra,
-    created_at,
-    updated_at,
-    clientes (
-      id,
-      nome,
-      email,
-      telefone
-    ),
-    compra_itens (
-      id,
-      produto_id,
-      descricao_produto,
-      quantidade,
-      valor_unitario,
-      subtotal_bruto,
-      desconto,
-      subtotal,
-      percentual_aplicado,
-      pontos_gerados
-    ),
-    lotes_pontos (
-      id,
-      compra_id,
-      cliente_id,
-      lojista_id,
-      nivel_id,
-      percentual_aplicado,
-      teto_aplicado,
-      pontos_gerados,
-      pontos_disponiveis,
-      pontos_pendentes,
-      pontos_gastos,
-      pontos_expirados,
-      pontos_cancelados,
-      status,
-      gerado_em,
-      expira_em,
-      created_at
+    .from("compras")
+    .select(
+      `
+        id,
+        lojista_id,
+        cliente_id,
+        subtotal_bruto,
+        desconto_total,
+        valor_total,
+        pontos_total,
+        status,
+        origem,
+        data_compra,
+        created_at,
+        updated_at,
+        ${clienteRelation} (
+          id,
+          nome,
+          email,
+          telefone
+        ),
+        compra_itens (
+          id,
+          produto_id,
+          descricao_produto,
+          quantidade,
+          valor_unitario,
+          subtotal_bruto,
+          desconto,
+          subtotal,
+          percentual_aplicado,
+          pontos_gerados
+        ),
+        lotes_pontos (
+          id,
+          compra_id,
+          cliente_id,
+          lojista_id,
+          nivel_id,
+          percentual_aplicado,
+          teto_aplicado,
+          pontos_gerados,
+          pontos_disponiveis,
+          pontos_pendentes,
+          pontos_gastos,
+          pontos_expirados,
+          pontos_cancelados,
+          status,
+          gerado_em,
+          expira_em,
+          created_at
+        )
+      `,
+      { count: "exact" }
     )
-  `)
-  .eq("lojista_id", lojistaId)
-  .order("data_compra", { ascending: false });
+    .eq("lojista_id", lojistaId)
+    .order("data_compra", { ascending: false })
+    .order("created_at", { ascending: false });
 
-  const { data, error } = await query;
-  if (error) throw new Error(error.message);
+  if (busca) {
+    query = query.ilike("clientes.nome", `%${busca}%`);
+  }
 
-  let rows = (data ?? []).map((item: any) => {
-  const lotes = (item.lotes_pontos ?? [])
-    .map((lp: any) => ({
-      ...lp,
-      percentual_aplicado: Number(lp.percentual_aplicado ?? 0),
-      teto_aplicado: Number(lp.teto_aplicado ?? 0),
-      pontos_gerados: Number(lp.pontos_gerados ?? 0),
-      pontos_disponiveis: Number(lp.pontos_disponiveis ?? 0),
-      pontos_pendentes: Number(lp.pontos_pendentes ?? 0),
-      pontos_gastos: Number(lp.pontos_gastos ?? 0),
-      pontos_expirados: Number(lp.pontos_expirados ?? 0),
-      pontos_cancelados: Number(lp.pontos_cancelados ?? 0),
-    }))
-    .sort((a: any, b: any) => {
-      const aTime = new Date(a.created_at ?? 0).getTime();
-      const bTime = new Date(b.created_at ?? 0).getTime();
-      return bTime - aTime;
-    });
-
-  const loteAtual =
-    lotes.find((lp: any) => lp.status === "disponivel" || lp.status === "pendente") ??
-    lotes[0] ??
-    null;
-
-  const cliente = Array.isArray(item.clientes)
-    ? item.clientes[0] ?? null
-    : item.clientes ?? null;
-
-  return {
-    id: item.id,
-    lojista_id: item.lojista_id,
-    cliente_id: item.cliente_id,
-    valor_total: Number(item.valor_total ?? 0),
-    pontos_total: Number(item.pontos_total ?? 0),
-    status: item.status ?? null,
-    origem: item.origem ?? null,
-    data_compra: item.data_compra,
-    created_at: item.created_at,
-    updated_at: item.updated_at ?? null,
-    subtotal_bruto: Number(item.subtotal_bruto ?? 0),
-    desconto_total: Number(item.desconto_total ?? 0),
-    cliente,
-    compra_itens: (item.compra_itens ?? []).map((ci: any) => ({
-      ...ci,
-      quantidade: Number(ci.quantidade),
-      valor_unitario: Number(ci.valor_unitario),
-      subtotal_bruto: Number(ci.subtotal_bruto ?? 0),
-      desconto: Number(ci.desconto ?? 0),
-      subtotal: Number(ci.subtotal),
-      percentual_aplicado: Number(ci.percentual_aplicado),
-      pontos_gerados: Number(ci.pontos_gerados),
-    })),
-    lotes_pontos: lotes,
-    lote: loteAtual,
-  };
-});
-
-  if (busca?.trim()) {
-    const term = busca.trim().toLowerCase();
-    rows = rows.filter((item: any) =>
-      item.cliente?.nome?.toLowerCase().includes(term)
+  if (filters.dataInicio) {
+    query = query.gte(
+      "data_compra",
+      toSaoPauloStartOfDay(filters.dataInicio)
     );
   }
 
-  return rows;
+  if (filters.dataFim) {
+    const diaPosterior = addDaysToDateOnly(filters.dataFim, 1);
+
+    query = query.lt(
+      "data_compra",
+      toSaoPauloStartOfDay(diaPosterior)
+    );
+  }
+
+  const { data, error, count } = await query.range(from, to);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  const rows = (data ?? []).map((item: any) => {
+    const lotes = (item.lotes_pontos ?? [])
+      .map((lp: any) => ({
+        ...lp,
+        percentual_aplicado: Number(lp.percentual_aplicado ?? 0),
+        teto_aplicado: Number(lp.teto_aplicado ?? 0),
+        pontos_gerados: Number(lp.pontos_gerados ?? 0),
+        pontos_disponiveis: Number(lp.pontos_disponiveis ?? 0),
+        pontos_pendentes: Number(lp.pontos_pendentes ?? 0),
+        pontos_gastos: Number(lp.pontos_gastos ?? 0),
+        pontos_expirados: Number(lp.pontos_expirados ?? 0),
+        pontos_cancelados: Number(lp.pontos_cancelados ?? 0),
+      }))
+      .sort((a: any, b: any) => {
+        const aTime = new Date(a.created_at ?? 0).getTime();
+        const bTime = new Date(b.created_at ?? 0).getTime();
+
+        return bTime - aTime;
+      });
+
+    const loteAtual =
+      lotes.find(
+        (lp: any) =>
+          lp.status === "disponivel" || lp.status === "pendente"
+      ) ??
+      lotes[0] ??
+      null;
+
+    const cliente = Array.isArray(item.clientes)
+      ? item.clientes[0] ?? null
+      : item.clientes ?? null;
+
+    return {
+      id: item.id,
+      lojista_id: item.lojista_id,
+      cliente_id: item.cliente_id,
+      valor_total: Number(item.valor_total ?? 0),
+      pontos_total: Number(item.pontos_total ?? 0),
+      status: item.status ?? null,
+      origem: item.origem ?? null,
+      data_compra: item.data_compra,
+      created_at: item.created_at,
+      updated_at: item.updated_at ?? null,
+      subtotal_bruto: Number(item.subtotal_bruto ?? 0),
+      desconto_total: Number(item.desconto_total ?? 0),
+      cliente,
+      compra_itens: (item.compra_itens ?? []).map((ci: any) => ({
+        ...ci,
+        quantidade: Number(ci.quantidade),
+        valor_unitario: Number(ci.valor_unitario),
+        subtotal_bruto: Number(ci.subtotal_bruto ?? 0),
+        desconto: Number(ci.desconto ?? 0),
+        subtotal: Number(ci.subtotal),
+        percentual_aplicado: Number(ci.percentual_aplicado),
+        pontos_gerados: Number(ci.pontos_gerados),
+      })),
+      lotes_pontos: lotes,
+      lote: loteAtual,
+    };
+  });
+
+  const total = count ?? 0;
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
+
+  return {
+    data: rows,
+    pagination: {
+      page,
+      pageSize,
+      total,
+      totalPages,
+    },
+  };
 }
 
 export async function createCompra(

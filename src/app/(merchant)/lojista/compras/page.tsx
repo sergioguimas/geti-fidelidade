@@ -1,7 +1,14 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Receipt, Search } from "lucide-react";
+import {
+  ChevronLeft,
+  ChevronRight,
+  Filter,
+  Receipt,
+  Search,
+  X,
+} from "lucide-react";
 import { CompraForm } from "@/components/lojista/compra-form";
 import { ComprasTable } from "@/components/lojista/compras-table";
 import { CancelCompraModal } from "@/components/lojista/compra-cancel";
@@ -9,6 +16,7 @@ import type {
   ClienteOption,
   CompraCancelamentoPreview,
   CompraListItem,
+  ComprasPagination,
   ProdutoOption,
 } from "@/lib/types";
 import { authFetch } from "@/lib/api";
@@ -18,6 +26,21 @@ export default function ComprasPage() {
   const [clientes, setClientes] = useState<ClienteOption[]>([]);
   const [produtos, setProdutos] = useState<ProdutoOption[]>([]);
   const [busca, setBusca] = useState("");
+  const [dataInicio, setDataInicio] = useState("");
+  const [dataFim, setDataFim] = useState("");
+
+  const [filtroDataInicio, setFiltroDataInicio] = useState("");
+  const [filtroDataFim, setFiltroDataFim] = useState("");
+
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
+
+  const [pagination, setPagination] = useState<ComprasPagination>({
+    page: 1,
+    pageSize: 20,
+    total: 0,
+    totalPages: 1,
+  });
   const [loading, setLoading] = useState(true);
   const [loadingClientes, setLoadingClientes] = useState(true);
   const [loadingProdutos, setLoadingProdutos] = useState(true);
@@ -39,8 +62,19 @@ export default function ComprasPage() {
       params.set("busca", busca.trim());
     }
 
+    if (filtroDataInicio) {
+      params.set("dataInicio", filtroDataInicio);
+    }
+
+    if (filtroDataFim) {
+      params.set("dataFim", filtroDataFim);
+    }
+
+    params.set("page", String(page));
+    params.set("pageSize", String(pageSize));
+
     return params.toString();
-  }, [busca]);
+  }, [busca, filtroDataInicio, filtroDataFim, page, pageSize]);
 
   async function loadCompras() {
     setLoading(true);
@@ -69,6 +103,14 @@ export default function ComprasPage() {
       }
 
       setCompras(result.data ?? []);
+      setPagination(
+        result.pagination ?? {
+          page: 1,
+          pageSize,
+          total: result.data?.length ?? 0,
+          totalPages: 1,
+        }
+      );
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erro inesperado.");
     } finally {
@@ -147,6 +189,10 @@ export default function ComprasPage() {
   useEffect(() => {
     loadProdutos();
   }, []);
+
+  useEffect(() => {
+    setPage(1);
+  }, [busca]);
 
   function handleNewCompra() {
     if (openForm && !editingCompra) {
@@ -260,6 +306,27 @@ export default function ComprasPage() {
     setCancelPreview(null);
   }
 
+  function handleApplyFilters() {
+    if (dataInicio && dataFim && dataInicio > dataFim) {
+      setError("A data inicial não pode ser posterior à data final.");
+      return;
+    }
+
+    setError(null);
+    setPage(1);
+    setFiltroDataInicio(dataInicio);
+    setFiltroDataFim(dataFim);
+  }
+
+  function handleClearFilters() {
+    setDataInicio("");
+    setDataFim("");
+    setFiltroDataInicio("");
+    setFiltroDataFim("");
+    setPage(1);
+    setError(null);
+  }
+
   return (
     <div className="fundo">
       <section className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
@@ -308,6 +375,7 @@ export default function ComprasPage() {
                       id: editingCompra.id,
                       clienteId: editingCompra.cliente_id,
                       dataCompra: editingCompra.data_compra,
+                      descontoTotal: editingCompra.desconto_total ?? 0,
                       itens: editingCompra.compra_itens.map((item) => ({
                         produtoId: item.produto_id,
                         quantidade: item.quantidade,
@@ -329,14 +397,71 @@ export default function ComprasPage() {
       ) : null}
 
       <section className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm">
-        <div className="relative">
-          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400" />
-          <input
-            value={busca}
-            onChange={(e) => setBusca(e.target.value)}
-            placeholder="Buscar compra por nome do cliente"
-            className="w-full rounded-xl border border-zinc-200 bg-white py-2.5 pl-9 pr-3 text-sm outline-none placeholder:text-zinc-400 focus:border-zinc-400"
-          />
+        <div className="grid gap-4 lg:grid-cols-[minmax(260px,1fr)_180px_180px_auto] lg:items-end">
+          <div>
+            <label className="mb-1.5 block text-sm font-medium text-zinc-700">
+              Buscar cliente
+            </label>
+
+            <div className="relative">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400" />
+
+              <input
+                value={busca}
+                onChange={(e) => setBusca(e.target.value)}
+                placeholder="Buscar venda por nome do cliente"
+                className="w-full rounded-xl border border-zinc-200 bg-white py-2.5 pl-9 pr-3 text-sm outline-none placeholder:text-zinc-400 focus:border-zinc-400"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="mb-1.5 block text-sm font-medium text-zinc-700">
+              Data inicial
+            </label>
+
+            <input
+              type="date"
+              value={dataInicio}
+              onChange={(e) => setDataInicio(e.target.value)}
+              className="w-full rounded-xl border border-zinc-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-zinc-400"
+            />
+          </div>
+
+          <div>
+            <label className="mb-1.5 block text-sm font-medium text-zinc-700">
+              Data final
+            </label>
+
+            <input
+              type="date"
+              value={dataFim}
+              onChange={(e) => setDataFim(e.target.value)}
+              className="w-full rounded-xl border border-zinc-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-zinc-400"
+            />
+          </div>
+
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={handleApplyFilters}
+              className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-zinc-900 px-4 py-2.5 text-sm font-medium text-white"
+            >
+              <Filter className="h-4 w-4" />
+              Filtrar
+            </button>
+
+            {(filtroDataInicio || filtroDataFim) && (
+              <button
+                type="button"
+                onClick={handleClearFilters}
+                title="Limpar filtro"
+                className="inline-flex items-center justify-center rounded-xl border border-zinc-200 bg-white px-3 py-2.5 text-zinc-600 hover:bg-zinc-50"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            )}
+          </div>
         </div>
       </section>
 
@@ -358,6 +483,73 @@ export default function ComprasPage() {
             onDelete={handleRequestCancelCompra}
           />
         )}
+        {!loading && pagination.total > 0 ? (
+          <section className="flex flex-col gap-3 rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between">
+            <div className="text-sm text-zinc-600">
+              Mostrando{" "}
+              <strong className="text-zinc-900">
+                {(pagination.page - 1) * pagination.pageSize + 1}
+              </strong>{" "}
+              até{" "}
+              <strong className="text-zinc-900">
+                {Math.min(
+                  pagination.page * pagination.pageSize,
+                  pagination.total
+                )}
+              </strong>{" "}
+              de{" "}
+              <strong className="text-zinc-900">{pagination.total}</strong>{" "}
+              vendas
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2">
+              <select
+                value={pageSize}
+                onChange={(e) => {
+                  setPageSize(Number(e.target.value));
+                  setPage(1);
+                }}
+                className="rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm outline-none focus:border-zinc-400"
+              >
+                <option value={10}>10 por página</option>
+                <option value={20}>20 por página</option>
+                <option value={50}>50 por página</option>
+              </select>
+
+              <button
+                type="button"
+                onClick={() => setPage((current) => Math.max(1, current - 1))}
+                disabled={pagination.page <= 1}
+                className="inline-flex items-center gap-1 rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm font-medium text-zinc-700 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                <ChevronLeft className="h-4 w-4" />
+                Anterior
+              </button>
+
+              <span className="px-2 text-sm text-zinc-600">
+                Página{" "}
+                <strong className="text-zinc-900">{pagination.page}</strong> de{" "}
+                <strong className="text-zinc-900">
+                  {pagination.totalPages}
+                </strong>
+              </span>
+
+              <button
+                type="button"
+                onClick={() =>
+                  setPage((current) =>
+                    Math.min(pagination.totalPages, current + 1)
+                  )
+                }
+                disabled={pagination.page >= pagination.totalPages}
+                className="inline-flex items-center gap-1 rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm font-medium text-zinc-700 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                Próxima
+                <ChevronRight className="h-4 w-4" />
+              </button>
+            </div>
+          </section>
+        ) : null}
       </section>
 
       <CancelCompraModal

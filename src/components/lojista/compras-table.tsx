@@ -72,7 +72,7 @@ export function ComprasTable({
               Pontos
             </th>
             <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-zinc-500">
-              Lançada em
+              Data da Venda
             </th>
             <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-zinc-500">
               Origem
@@ -132,7 +132,7 @@ export function ComprasTable({
                 </td>
 
                 <td className="px-4 py-4 align-middle text-sm text-zinc-700">
-                  {formatDateTime(compra.created_at)}
+                  {formatDateTime(compra.data_compra)}
                 </td>
 
                 <td className="px-4 py-4 align-middle text-sm text-zinc-700">

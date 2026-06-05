@@ -108,6 +108,26 @@ export type CompraListItem = {
   lote: LotePontosListItem | null;
 };
 
+export type ComprasPagination = {
+  page: number;
+  pageSize: number;
+  total: number;
+  totalPages: number;
+};
+
+export type ComprasListResponse = {
+  data: CompraListItem[];
+  pagination: ComprasPagination;
+};
+
+export type CompraListFilters = {
+  busca?: string;
+  dataInicio?: string;
+  dataFim?: string;
+  page?: number;
+  pageSize?: number;
+};
+
 export type ProdutoListItem = {
   id: string;
   lojista_id: string;

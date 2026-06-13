@@ -43,6 +43,25 @@ function formatCurrency(value: number) {
   }).format(value);
 }
 
+function getTodaySaoPauloDateInput() {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Sao_Paulo",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date());
+}
+
+function getCompraDateInput(value: string) {
+  const dateOnly = value.slice(0, 10);
+
+  if (/^\d{4}-\d{2}-\d{2}$/.test(dateOnly)) {
+    return dateOnly;
+  }
+
+  return getTodaySaoPauloDateInput();
+}
+
 function createEmptyItem(): ItemForm {
   return {
     id: crypto.randomUUID(),
@@ -243,8 +262,8 @@ export function CompraForm({
     setClienteId(initialData?.clienteId ?? "");
     setDataCompra(
       initialData?.dataCompra
-        ? initialData.dataCompra.slice(0, 10)
-        : new Date().toISOString().slice(0, 10)
+        ? getCompraDateInput(initialData.dataCompra)
+        : getTodaySaoPauloDateInput()
     );
     
     setDescontoTotal(
@@ -487,7 +506,7 @@ export function CompraForm({
 
       setClienteId("");
       setItens([createEmptyItem()]);
-      setDataCompra(new Date().toISOString().slice(0, 10));
+      setDataCompra(getTodaySaoPauloDateInput());
       setDescontoTotal("");
 
       await onCreated();

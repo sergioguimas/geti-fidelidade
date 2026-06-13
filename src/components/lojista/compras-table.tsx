@@ -17,15 +17,15 @@ function formatCurrency(value: number) {
   }).format(value);
 }
 
-function formatDateTime(value: string) {
-  return new Intl.DateTimeFormat("pt-BR", {
-    timeZone: "America/Sao_Paulo",
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(new Date(value));
+function formatDate(value: string) {
+  const dateOnly = value.slice(0, 10);
+  const [year, month, day] = dateOnly.split("-");
+
+  if (!year || !month || !day) {
+    return "Data inválida";
+  }
+
+  return `${day}/${month}/${year}`;
 }
 
 function mapCompraStatus(status: CompraListItem["status"]) {
@@ -132,7 +132,7 @@ export function ComprasTable({
                 </td>
 
                 <td className="px-4 py-4 align-middle text-sm text-zinc-700">
-                  {formatDateTime(compra.data_compra)}
+                  {formatDate(compra.data_compra)}
                 </td>
 
                 <td className="px-4 py-4 align-middle text-sm text-zinc-700">

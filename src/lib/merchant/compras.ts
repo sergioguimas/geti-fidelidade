@@ -26,6 +26,16 @@ function toSaoPauloStartOfDay(dateOnly: string) {
   return `${dateOnly}T00:00:00.000-03:00`;
 }
 
+function normalizeCompraDateToSaoPauloStart(value: string) {
+  const dateOnly = value.slice(0, 10);
+
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dateOnly)) {
+    throw new Error("Data da compra inválida.");
+  }
+
+  return toSaoPauloStartOfDay(dateOnly);
+}
+
 function toCents(value: number) {
   return Math.round(round2(value) * 100);
 }
@@ -389,7 +399,7 @@ export async function createCompra(
       valor_total: valorTotal,
       origem: input.origem ?? "lojista",
       status: input.status ?? "aprovada",
-      data_compra: input.dataCompra,
+      data_compra: normalizeCompraDateToSaoPauloStart(input.dataCompra),
     })
     .select(
       "id, lojista_id, cliente_id, subtotal_bruto, desconto_total, valor_total, pontos_total, status, origem, data_compra, created_at, updated_at"
@@ -484,7 +494,7 @@ export async function updateCompra(
       pontos_total: 0,
       origem: input.origem ?? "lojista",
       status: input.status ?? "aprovada",
-      data_compra: input.dataCompra,
+      data_compra: normalizeCompraDateToSaoPauloStart(input.dataCompra),
       updated_at: new Date().toISOString(),
     })
     .eq("id", input.id)

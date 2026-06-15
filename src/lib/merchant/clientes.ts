@@ -280,7 +280,9 @@ export async function createCliente(
   }
 
   if (!cliente) {
-    const { data: insertedCliente, error: insertError } = await supabase
+    const admin = createAdminClient();
+
+    const { data: insertedCliente, error: insertError } = await admin
       .from("clientes")
       .insert({
         nome,

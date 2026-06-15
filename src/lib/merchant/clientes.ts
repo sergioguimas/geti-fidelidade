@@ -280,49 +280,35 @@ export async function createCliente(
   }
 
   if (!cliente) {
-    const { error: insertError } = await supabase.from("clientes").insert({
-      nome,
-      telefone,
-      email,
-      cnpj,
-      pode_fazer_login: false,
-    });
+    const { data: insertedCliente, error: insertError } = await supabase
+      .from("clientes")
+      .insert({
+        nome,
+        telefone,
+        email,
+        cnpj,
+        pode_fazer_login: false,
+      })
+      .select(`
+        id,
+        nome,
+        telefone,
+        email,
+        cnpj,
+        auth_user_id,
+        pode_fazer_login,
+        acesso_ativado_em,
+        ultimo_login_em,
+        created_at,
+        updated_at
+      `)
+      .single();
 
-    if (insertError) {
-      throw new Error(insertError.message);
+    if (insertError || !insertedCliente) {
+      throw new Error(insertError?.message ?? "Erro ao cadastrar cliente.");
     }
 
-    if (cnpj) {
-      cliente = await findGlobalClienteByCnpj(cnpj);
-    } else {
-      const admin = createAdminClient();
-
-      const { data, error } = await admin
-        .from("clientes")
-        .select(`
-          id,
-          nome,
-          telefone,
-          email,
-          cnpj,
-          auth_user_id,
-          pode_fazer_login,
-          acesso_ativado_em,
-          ultimo_login_em,
-          created_at,
-          updated_at
-        `)
-        .eq("email", email)
-        .order("created_at", { ascending: false })
-        .limit(1)
-        .maybeSingle();
-
-      if (error || !data) {
-        throw new Error(error?.message ?? "Erro ao localizar cliente recém-criado.");
-      }
-
-      cliente = data;
-    }
+    cliente = insertedCliente;
   }
 
   await ensureClienteFidelidade(supabase, {

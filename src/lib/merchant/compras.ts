@@ -72,16 +72,17 @@ function buildCompraItens(
       throw new Error(`Produto inválido ou não encontrado: ${item.produtoId}`);
     }
 
-    if (item.quantidade <= 0) {
+    const quantidade = Number(item.quantidade);
+    const valorUnitario = round4(Number(item.valorUnitario));
+
+    if (!Number.isFinite(quantidade) || quantidade <= 0) {
       throw new Error("Quantidade deve ser maior que zero.");
     }
 
-    if (item.valorUnitario < 0) {
+    if (!Number.isFinite(valorUnitario) || valorUnitario < 0) {
       throw new Error("Valor unitário inválido.");
     }
 
-    const quantidade = Number(item.quantidade);
-    const valorUnitario = round4(Number(item.valorUnitario));
     const subtotalBruto = round2(quantidade * valorUnitario);
     const desconto = round2(Number(item.desconto ?? 0));
 
@@ -142,30 +143,74 @@ function aplicarDescontoTotalNosItens(
     );
   }
 
-  const subtotalBruto = round2(
-    itens.reduce((sum, item) => sum + item.subtotal_bruto, 0)
-  );
+  const subtotaisCents = itens.map((item) => toCents(item.subtotal_bruto));
+  const subtotalBrutoCents = subtotaisCents.reduce((sum, value) => sum + value, 0);
+  const descontoTotalCents = toCents(descontoTotal);
 
-  if (descontoTotal > subtotalBruto) {
+  if (subtotalBrutoCents <= 0) {
+    throw new Error("Não é possível aplicar desconto total em uma compra sem subtotal.");
+  }
+
+  if (descontoTotalCents > subtotalBrutoCents) {
     throw new Error("O desconto total não pode ser maior que o subtotal da compra.");
   }
 
-  const totalCents = toCents(descontoTotal);
-  const baseCents = Math.floor(totalCents / itens.length);
-  const restoCents = totalCents % itens.length;
+  /**
+   * Rateio proporcional:
+   * Cada item recebe uma parte do desconto proporcional ao seu subtotal.
+   *
+   * Exemplo:
+   * Compra: R$ 1.000,00
+   * Desconto: R$ 100,00
+   * Item de R$ 500,00 recebe R$ 50,00
+   * Item de R$ 20,00 recebe R$ 2,00
+   */
+  const distribuicao = subtotaisCents.map((subtotalCents, index) => {
+    const valorIdeal = (descontoTotalCents * subtotalCents) / subtotalBrutoCents;
+    const descontoBaseCents = Math.floor(valorIdeal);
+
+    return {
+      index,
+      subtotalCents,
+      descontoCents: descontoBaseCents,
+      resto: valorIdeal - descontoBaseCents,
+    };
+  });
+
+  let centsRestantes =
+    descontoTotalCents -
+    distribuicao.reduce((sum, item) => sum + item.descontoCents, 0);
+
+  /**
+   * Distribui os centavos restantes para os itens com maiores frações,
+   * sem deixar nenhum desconto passar do subtotal do próprio item.
+   */
+  const ordemPorResto = [...distribuicao].sort((a, b) => b.resto - a.resto);
+
+  for (const item of ordemPorResto) {
+    if (centsRestantes <= 0) break;
+
+    if (item.descontoCents < item.subtotalCents) {
+      item.descontoCents += 1;
+      centsRestantes -= 1;
+    }
+  }
+
+  const descontosPorIndex = new Map(
+    distribuicao.map((item) => [item.index, item.descontoCents])
+  );
 
   return itens.map((item, index) => {
-    const descontoRateado = fromCents(
-      baseCents + (index < restoCents ? 1 : 0)
-    );
+    const descontoRateadoCents = descontosPorIndex.get(index) ?? 0;
 
-    if (descontoRateado > item.subtotal_bruto) {
+    if (descontoRateadoCents > subtotaisCents[index]) {
       throw new Error(
-        "O desconto total dividido igualmente ficou maior que o subtotal de um dos itens."
+        "O desconto proporcional ficou maior que o subtotal de um dos itens."
       );
     }
 
-    const subtotal = round2(item.subtotal_bruto - descontoRateado);
+    const descontoRateado = fromCents(descontoRateadoCents);
+    const subtotal = fromCents(subtotaisCents[index] - descontoRateadoCents);
     const pontosGerados = round2((subtotal * item.percentual_aplicado) / 100);
 
     return {

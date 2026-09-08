@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireLojistaContext } from "@/lib/auth/server-context";
+import { respostaDeErro } from "@/lib/erros";
 import {
   createNivel,
   deleteNivel,
@@ -16,15 +17,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ data });
   } catch (error) {
-    return NextResponse.json(
-      {
-        error:
-          error instanceof Error
-            ? error.message
-            : "Erro ao carregar configurações.",
-      },
-      { status: 500 }
-    );
+    return respostaDeErro(error, "Erro ao carregar configurações.");
   }
 }
 
@@ -48,15 +41,7 @@ export async function PATCH(request: NextRequest) {
       { status: 400 }
     );
   } catch (error) {
-    return NextResponse.json(
-      {
-        error:
-          error instanceof Error
-            ? error.message
-            : "Erro ao atualizar configurações.",
-      },
-      { status: 500 }
-    );
+    return respostaDeErro(error, "Erro ao atualizar configurações.");
   }
 }
 
@@ -75,15 +60,7 @@ export async function POST(request: NextRequest) {
     const data = await createNivel(supabase, lojistaId, body.payload);
     return NextResponse.json({ data }, { status: 201 });
   } catch (error) {
-    return NextResponse.json(
-      {
-        error:
-          error instanceof Error
-            ? error.message
-            : "Erro ao criar nível.",
-      },
-      { status: 500 }
-    );
+    return respostaDeErro(error, "Erro ao criar nível.");
   }
 }
 
@@ -94,23 +71,12 @@ export async function DELETE(request: NextRequest) {
     const id = searchParams.get("id");
 
     if (!id) {
-      return NextResponse.json(
-        { error: "id é obrigatório." },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: "id é obrigatório." }, { status: 400 });
     }
 
     const data = await deleteNivel(supabase, lojistaId, id);
     return NextResponse.json({ data });
   } catch (error) {
-    return NextResponse.json(
-      {
-        error:
-          error instanceof Error
-            ? error.message
-            : "Erro ao excluir nível.",
-      },
-      { status: 500 }
-    );
+    return respostaDeErro(error, "Erro ao excluir nível.");
   }
 }

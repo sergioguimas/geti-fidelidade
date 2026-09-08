@@ -45,10 +45,11 @@ end if
 | `n > 0` | teto próprio | `least(n, nivel.percentual_conversao)` |
 
 Isso exige migration tornando `teto_percentual` nullable e ajustando `fn_processar_compra`.
-**Decisão pendente do Sérgio:** os dois produtos que hoje estão com `0` devem virar `0` na
-nova semântica (param de pontuar, que é o mais provável que o lojista quis) ou `NULL`
-(seguem o nível, preservando o comportamento atual)? Não implementar a migration sem essa
-resposta.
+
+**Decidido em 08/set/2026:** os dois produtos que hoje estão com `0` (`ESCOLTA` e
+`COLUNA 21M EMINEX`) **continuam com `0`** e passam a não pontuar — que é o que o lojista quis
+dizer ao digitar zero. A migration não precisa converter nada: só mudar a semântica de leitura
+no motor. O efeito prático é que esses dois itens deixam de gerar pontos nas próximas compras.
 
 ## Operações
 

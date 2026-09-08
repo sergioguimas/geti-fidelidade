@@ -88,6 +88,11 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Um emissor de token por vez: o GoTrue guarda UM token de recuperação por
+    // usuário, então mandar por WhatsApp e depois chamar resetPasswordForEmail
+    // matava o link recém-enviado.
+    let enviadoPorWhatsapp = false;
+
     if (lojista.telefone && process.env.N8N_WEBHOOK_WHATSAPP) {
       const telefone = normalizePhone(lojista.telefone);
 
@@ -111,19 +116,28 @@ Se não foi você, ignore esta mensagem.`;
           body: JSON.stringify({
             telefone,
             mensagem,
+            // Para o fluxo do N8N mandar o MESMO link por e-mail.
+            email: loginEmail,
+            assunto: "Seu acesso ao sistema de fidelidade",
           }),
         });
+
+        enviadoPorWhatsapp = true;
       } catch (err) {
         console.warn("Falha ao enviar WhatsApp via N8N:", err);
       }
     }
 
-    try {
-      await supabaseAdmin.auth.resetPasswordForEmail(loginEmail, {
-        redirectTo,
-      });
-    } catch (err) {
-      console.warn("Falha ao enviar email de recovery:", err);
+    // Só quando nada foi entregue pelo WhatsApp: aí invalidar o token gerado
+    // acima não tira nada de ninguém.
+    if (!enviadoPorWhatsapp) {
+      try {
+        await supabaseAdmin.auth.resetPasswordForEmail(loginEmail, {
+          redirectTo,
+        });
+      } catch (err) {
+        console.warn("Falha ao enviar email de recovery:", err);
+      }
     }
 
     return NextResponse.json({

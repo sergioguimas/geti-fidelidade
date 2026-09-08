@@ -49,8 +49,8 @@ percentual_item =
 > Isso contraria diretamente a promessa 4 do plano.
 
 Exige migration tornando `produtos.teto_percentual` **nullable**. Os dois produtos que hoje
-estão com `0` (`ESCOLTA` e `COLUNA 21M EMINEX`) precisam de decisão do Sérgio antes: viram `0`
-na semântica nova, ou `NULL`? Ver [contrato de produtos](produtos.md).
+estão com `0` (`ESCOLTA` e `COLUNA 21M EMINEX`) **ficam em `0`** e passam a não pontuar
+(decidido em 08/set/2026) — a migration não converte dado nenhum, só muda a leitura.
 
 ### 2. Contribuição exata por item, truncamento uma vez só — N4
 
@@ -261,8 +261,9 @@ O resto deste contrato **não depende de N1** e pode ser implementado agora.
 Da menor para a maior superfície de risco. Cada passo é uma migration própria, e os três
 primeiros não mudam número nenhum que já esteja na tela:
 
-1. **Fallback de nível** (S12) — para de derrubar venda. Urgente: os dois lojistas estão
-   configurados de forma a travar.
+1. ~~**Fallback de nível** (S12)~~ — ✅ **feito em 08/set/2026**, migration
+   `20260908210212_fallback_nivel_por_streak`, junto com a validação de cobertura na
+   configuração.
 2. **Dropar o trigger** (S3) — para de gerar lote-lixo.
 3. **Ledger como fonte da dívida** (S4) — cria `quitacao_saldo_negativo`, dropa `ajustes_pontos`,
    cancelamento passa a registrar no ledger e a chamar rebuild.

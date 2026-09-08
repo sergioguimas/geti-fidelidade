@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAdminApi } from "@/lib/admin/api-auth";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { NIVEL_INICIAL, PROGRAMA_INICIAL } from "@/contracts/acesso";
 
 function normalizeCnpj(value: string) {
   return value.replace(/\D/g, "");
@@ -182,61 +183,139 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // ================= LINK PRIMEIRO ACESSO =================
+    // ================= PROGRAMA INICIAL =================
+    //
+    // Sem isto o tenant nasce inoperante: a tela de configuração abre vazia e
+    // sem saída, e a primeira venda falha em fn_programa_ativo (S13).
+    // Valores em src/contracts/acesso.ts, aprovados em 08/set/2026.
+    //
+    // A compensação abaixo é manual porque a criação atravessa Auth + 4 tabelas.
+    // Trocar por uma fn_provisionar_lojista transacional é o passo 5 do
+    // contrato de provisionamento.
 
-    const redirectTo = `${process.env.NEXT_PUBLIC_APP_URL}/primeiro-acesso`;
-
-    const { data: linkData, error: linkError } =
-      await supabaseAdmin.auth.admin.generateLink({
-        type: "recovery",
-        email: loginEmail,
-        options: {
-          redirectTo,
-        },
-      });
-
-    if (linkError) {
-      console.error("Erro ao gerar link:", linkError);
+    async function desfazerCriacao() {
+      await supabaseAdmin.from("lojistas_usuarios").delete().eq("lojista_id", lojista.id);
+      await supabaseAdmin.from("lojistas").delete().eq("id", lojista.id);
+      await supabaseAdmin.auth.admin.deleteUser(authUserId);
     }
 
-    const actionLink = linkData?.properties?.action_link;
+    const { data: programa, error: programaError } = await supabaseAdmin
+      .from("programas_fidelidade")
+      .insert({
+        lojista_id: lojista.id,
+        nome: PROGRAMA_INICIAL.nome,
+        dias_expiracao_pontos: PROGRAMA_INICIAL.dias_expiracao_pontos,
+        dias_para_perder_streak: PROGRAMA_INICIAL.dias_para_perder_streak,
+        ativo: true,
+      })
+      .select("id")
+      .single();
 
-    // ================= WHATSAPP (N8N) =================
+    if (programaError || !programa) {
+      await desfazerCriacao();
 
-    if (telefoneNormalizado && actionLink) {
-      const mensagem = `Olá ${nomeResponsavel ?? nomeFantasia}! 👋
+      return NextResponse.json(
+        { error: "Erro ao criar o programa de fidelidade inicial do lojista." },
+        { status: 500 }
+      );
+    }
 
-      Sua conta foi criada no sistema de fidelidade.
+    // streak_max nulo: a faixa nasce ABERTA, para o tenant já satisfazer a
+    // invariante de cobertura desde o primeiro segundo (S12).
+    const { error: nivelError } = await supabaseAdmin
+      .from("programa_niveis")
+      .insert({
+        programa_id: programa.id,
+        nome: NIVEL_INICIAL.nome,
+        streak_min: NIVEL_INICIAL.streak_min,
+        streak_max: NIVEL_INICIAL.streak_max,
+        percentual_conversao: NIVEL_INICIAL.percentual_conversao,
+        teto_pontos_compra: NIVEL_INICIAL.teto_pontos_compra,
+        ordem: NIVEL_INICIAL.ordem,
+      });
 
-      Para acessar pela primeira vez e definir sua senha:
-      👉 ${actionLink}
+    if (nivelError) {
+      // programa_niveis tem FK ON DELETE CASCADE, então apagar o programa basta.
+      await supabaseAdmin.from("programas_fidelidade").delete().eq("id", programa.id);
+      await desfazerCriacao();
 
-      Se não foi você, ignore esta mensagem.`;
+      return NextResponse.json(
+        { error: "Erro ao criar o nível inicial do lojista." },
+        { status: 500 }
+      );
+    }
 
-      try {
-        await fetch(process.env.N8N_WEBHOOK_WHATSAPP!, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            telefone: telefoneNormalizado,
-            mensagem,
-          }),
+    // ================= LINK DE PRIMEIRO ACESSO =================
+    //
+    // O GoTrue guarda UM token de recuperação por usuário. O código anterior
+    // gerava o link, mandava no WhatsApp e logo depois chamava
+    // resetPasswordForEmail — o que emitia um segundo token e matava o link
+    // recém-enviado. Agora só existe um emissor por vez.
+
+    const redirectTo = `${process.env.NEXT_PUBLIC_APP_URL}/primeiro-acesso`;
+    const podeWhatsapp = Boolean(
+      telefoneNormalizado && process.env.N8N_WEBHOOK_WHATSAPP
+    );
+
+    let conviteEnviadoPor: "whatsapp" | "email" | "nenhum" = "nenhum";
+
+    if (podeWhatsapp) {
+      const { data: linkData, error: linkError } =
+        await supabaseAdmin.auth.admin.generateLink({
+          type: "recovery",
+          email: loginEmail,
+          options: { redirectTo },
         });
-      } catch (err) {
-        console.warn("Falha ao enviar WhatsApp via N8N:", err);
+
+      const actionLink = linkData?.properties?.action_link;
+
+      if (linkError || !actionLink) {
+        console.error("Erro ao gerar link de primeiro acesso:", linkError);
+      } else {
+        const mensagem = `Olá ${nomeResponsavel ?? nomeFantasia}! 👋
+
+Sua conta foi criada no sistema de fidelidade.
+
+Para acessar pela primeira vez e definir sua senha:
+👉 ${actionLink}
+
+Se não foi você, ignore esta mensagem.`;
+
+        try {
+          await fetch(process.env.N8N_WEBHOOK_WHATSAPP!, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              telefone: telefoneNormalizado,
+              mensagem,
+              // Para o fluxo do N8N poder mandar o MESMO link por e-mail.
+              // Enquanto ele não tratar estes campos, o e-mail não sai — e é
+              // por isso que o caminho sem telefone abaixo continua existindo.
+              email: loginEmail,
+              assunto: "Seu acesso ao sistema de fidelidade",
+            }),
+          });
+
+          conviteEnviadoPor = "whatsapp";
+        } catch (err) {
+          console.warn("Falha ao enviar WhatsApp via N8N:", err);
+        }
       }
     }
 
-    // ================= EMAIL (fallback opcional) =================
+    // Sem WhatsApp disponível, ou com falha no envio: o e-mail do Supabase é o
+    // único canal. Chamar aqui é seguro porque nenhum link foi entregue —
+    // invalidar o token anterior não tira nada de ninguém.
+    if (conviteEnviadoPor !== "whatsapp") {
+      try {
+        await supabaseAdmin.auth.resetPasswordForEmail(loginEmail, {
+          redirectTo,
+        });
 
-    try {
-      await supabaseAdmin.auth.resetPasswordForEmail(loginEmail, {
-        redirectTo: `${process.env.NEXT_PUBLIC_APP_URL}/primeiro-acesso`,
-      });
-    } catch (err) {
-      console.warn("Falha ao enviar email:", err);
+        conviteEnviadoPor = "email";
+      } catch (err) {
+        console.warn("Falha ao enviar email de primeiro acesso:", err);
+      }
     }
 
     // ================= RESPONSE =================
@@ -249,6 +328,10 @@ export async function POST(request: NextRequest) {
             authUserId,
             loginEmail,
           },
+          programaId: programa.id,
+          // "nenhum" significa lojista criado sem convite entregue: o admin
+          // precisa usar o reenvio. Não é motivo para desfazer a criação.
+          conviteEnviadoPor,
         },
       },
       { status: 201 }

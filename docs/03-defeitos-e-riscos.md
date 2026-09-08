@@ -261,7 +261,18 @@ condição e de quantas compras foram afetadas.
 
 ---
 
-## S12 · Crítico · Cliente que passa da última faixa de streak trava a venda
+## S12 · ✅ CORRIGIDO em 08/set/2026 · Cliente que passava da última faixa travava a venda
+
+> Corrigido nas duas pontas. **No motor:** migration `20260908210212_fallback_nivel_por_streak`
+> — `fn_nivel_por_streak` passa a usar a faixa de maior `ordem` em vez de lançar exceção.
+> Verificado contra produção: no programa Bronze (faixa 1–3), streak 4 e streak 99 agora
+> devolvem o nível em vez de estourar. **Na configuração:** `validarCoberturaDeFaixas` passou a
+> ser cobrada em `createNivel`, `updateNivel` e `deleteNivel`, então não dá mais para salvar um
+> conjunto de faixas com buraco, sobreposição ou sem topo aberto.
+>
+> As duas configurações que já estão em produção continuam sem faixa aberta — o fallback é o
+> que as protege. Elas só serão corrigidas quando o lojista editar os níveis, e aí a validação
+> vai exigir o conjunto completo.
 
 `fn_nivel_por_streak` **lança exceção** quando nenhuma faixa cobre o streak:
 
@@ -315,7 +326,11 @@ Números tirados do banco no dia, para priorizar pelo dano real e não pela grav
 
 ---
 
-## S13 · Crítico · O portal admin entrega um tenant que não funciona
+## S13 · ✅ CORRIGIDO em 08/set/2026 · O portal admin entregava um tenant que não funcionava
+
+> `POST /api/admin/lojistas` passa a provisionar programa e nível inicial junto com o lojista,
+> com o nível nascendo com `streak_max = null`. Valores em `src/contracts/acesso.ts`. A
+> compensação em caso de falha desfaz a cadeia inteira, incluindo o usuário do Auth.
 
 **Nada no sistema cria um `programas_fidelidade`.** Nem `POST /api/admin/lojistas`, nem a tela
 de configurações do lojista — `configuracoes.ts` só lê e atualiza, e a rota
@@ -353,6 +368,8 @@ fica no histórico do navegador.
 `/auth/confirmar` que chame `verifyOtp({ type: "recovery", token_hash })` no servidor. Ver o
 contrato.
 
-Relacionado ao já registrado em [contratos/admin.md](contratos/admin.md): `resetPasswordForEmail`
-chamado logo depois de `generateLink` emite um segundo token e invalida o primeiro, que é o que
-foi para o WhatsApp.
+Relacionado — e este **foi corrigido em 08/set/2026**: `resetPasswordForEmail` chamado logo
+depois de `generateLink` emitia um segundo token e invalidava o primeiro, que era o que ia para
+o WhatsApp. Agora só existe um emissor por vez, nas duas rotas (criação e reenvio de convite):
+havendo WhatsApp, o link vai por ele; não havendo, ou falhando o envio, o e-mail do Supabase é
+o canal. O ramo `?code=` em si continua morto até a rota `/auth/confirmar` existir.

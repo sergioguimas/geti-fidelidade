@@ -41,4 +41,6 @@ yarn-error.log*
 next-env.d.ts
 
 # schema
-*.sql
+# supabase/migrations/*.sql DEVE ser versionado (e o baseline do banco).
+# Ignorar apenas dumps soltos e artefatos temporarios do CLI.
+/supabase/.temp/

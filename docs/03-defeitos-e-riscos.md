@@ -257,3 +257,57 @@ como expressar "sem teto". Vira decisão de contrato.
 **Antes de corrigir, conferir os dados:** se algum produto em produção já está com teto zero,
 os lotes gerados por ele foram inflados. Vale um levantamento de quantos produtos estão nessa
 condição e de quantas compras foram afetadas.
+
+---
+
+## S12 · Crítico · Cliente que passa da última faixa de streak trava a venda
+
+`fn_nivel_por_streak` **lança exceção** quando nenhuma faixa cobre o streak:
+
+```sql
+if v_nivel.id is null then
+  raise exception 'Nenhum nível encontrado para programa % e streak %', ...
+```
+
+Ela é chamada por `fn_rebuild_cliente_fidelidade`, que por sua vez roda no **fim** de
+`fn_processar_compra`. Ou seja: quando o cliente ultrapassa a última faixa configurada, não é a
+pontuação que fica errada — **a compra inteira falha**. O lojista não consegue registrar a
+venda, e a mensagem que chega à tela é o texto cru do Postgres.
+
+### Estado em produção (08/set/2026)
+
+| Lojista | Programa | Faixas de nível | Clientes | Situação |
+|---|---|---|---|---|
+| `9f69ff2a` | Programa Padrão | **Bronze: streak 1 a 3** | 3 | 4 compras lançadas. Nenhum cliente chegou a streak 4 **ainda** |
+| `9402e00e` (piloto) | Fidelidade | Fidelidade: streak 1 a 60 | 122 | maior streak hoje é 15 |
+
+O piloto está longe do limite. O outro lojista está a **uma compra** de travar: qualquer um dos
+três clientes que faça a quarta compra consecutiva dentro da janela de streak derruba o
+lançamento.
+
+### Correção
+
+Duas camadas, e as duas são necessárias:
+
+1. **No motor** — a última faixa deve ser aberta. Se nenhuma casar, usar a de maior `ordem` em
+   vez de estourar. Nunca fazer uma venda falhar por causa de configuração de nível.
+2. **Na configuração** — validar ao salvar que as faixas cobrem de 1 ao infinito sem buraco e
+   sem sobreposição, e que a última tem `streak_max` nulo. Hoje nada impede o lojista de
+   configurar Bronze de 1 a 3 e parar por aí, que é exatamente o que aconteceu.
+
+Vale também revisar o texto de erro: hoje qualquer falha do motor volta como HTTP 500 com a
+mensagem do Postgres ([S9](03-defeitos-e-riscos.md)).
+
+---
+
+## Dimensionamento dos achados em produção — 08/set/2026
+
+Números tirados do banco no dia, para priorizar pelo dano real e não pela gravidade teórica.
+
+| Achado | Medida | Leitura |
+|---|---|---|
+| [S3](03-defeitos-e-riscos.md) lote-lixo | **363 lotes de 0 pontos** para **365 compras**; 1076 lotes no total | Confirmado: praticamente um lote-lixo por compra, quase 3 lotes por compra contando as edições |
+| [S5](03-defeitos-e-riscos.md) expiração morta | **1073 de 1076 lotes** com `expira_em` nulo. Os dois programas têm `dias_expiracao_pontos` preenchido (180 e 60) e `validade_dias` **nulo** | Confirmado pela causa exata que o documento previa: a UI grava um campo, o motor lê outro |
+| [S11](03-defeitos-e-riscos.md) teto zero | **2 produtos ativos** com teto 0: `ESCOLTA` e `COLUNA 21M EMINEX` | Real, mas de alcance pequeno hoje. Numa compra observada de R$ 14.912, o `teto_pontos_compra` do nível (50) cortou o total muito antes, mascarando a inflação |
+| [S6](03-defeitos-e-riscos.md) duas fórmulas | Na mesma compra, a soma dos itens gravada pelo TypeScript dá **124,13** e o lote tem **50** | Confirmado. Parte da diferença é o teto do nível, parte é a divergência de fórmula |
+| S12 faixa de streak | 0 clientes fora de faixa hoje, mas 1 lojista com teto de faixa em 3 e clientes ativos | Bomba-relógio: não dá erro hoje, derruba a venda amanhã |

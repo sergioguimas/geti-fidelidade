@@ -27,7 +27,8 @@
     "three": "^0.183.2",
     "three-stdlib": "^2.36.1",
     "vaul": "^1.1.2",
-    "xlsx": "^0.18.5"
+    "xlsx": "^0.18.5",
+    "zod": "^4.5.4"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",

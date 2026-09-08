@@ -81,7 +81,7 @@ export type RecuperarSenhaRequest = z.infer<typeof recuperarSenhaRequest>;
  * configuração abre vazia e sem saída, e a primeira venda falha em
  * fn_programa_ativo. Ver provisionamento-e-acesso.md, seção 1.
  *
- * Os valores esperam confirmação do Sérgio — são regra de negócio.
+ * Valores confirmados pelo Sérgio em 08/set/2026.
  */
 export const PROGRAMA_INICIAL = {
   nome: "Programa de Fidelidade",

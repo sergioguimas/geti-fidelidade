@@ -35,8 +35,7 @@ admin, hoje, entrega um tenant que não funciona, e a única saída é acesso di
 **Alvo:** a criação do lojista provisiona, na mesma transação lógica, um programa ativo com
 pelo menos um nível cobrindo `[1, ∞)`.
 
-Valores iniciais propostos — **precisam de confirmação do Sérgio**, porque são regra de
-negócio e não detalhe técnico:
+Valores iniciais, **confirmados pelo Sérgio em 08/set/2026**:
 
 | Campo | Proposto | Por quê |
 |---|---|---|
@@ -245,7 +244,7 @@ A confirmação de senha continua sendo validação de formulário, não vai par
 ## Ordem de implementação
 
 1. **Provisionar programa e nível na criação do lojista.** É o que desbloqueia o portal admin
-   — hoje ele entrega tenant quebrado. Depende de confirmar os valores iniciais.
+   — hoje ele entrega tenant quebrado. Valores iniciais já confirmados: pronto para implementar.
 2. **Parar de chamar `resetPasswordForEmail` depois de `generateLink`.** Uma linha removida
    conserta o link do WhatsApp.
 3. **Rota `/auth/confirmar` com `verifyOtp`**, e o convite passando a apontar para ela.

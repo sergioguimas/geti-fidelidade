@@ -81,6 +81,7 @@ código e a mensagem que o usuário deve ver.
 | [programa-e-niveis.md](programa-e-niveis.md) | **TO-BE** | — |
 | [admin.md](admin.md) | AS-IS | — |
 | [motor-de-pontos.md](motor-de-pontos.md) | **TO-BE** | parcial: o que envolve compra do cliente espera N1 |
+| [provisionamento-e-acesso.md](provisionamento-e-acesso.md) | **TO-BE** | — |
 
 Fora desta rodada, esperando decisão: **compras** e **aprovação** (bloqueados por N1),
 **resgate** e **área do cliente** (bloqueados por N1 e R3).

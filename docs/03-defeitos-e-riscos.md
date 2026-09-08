@@ -312,3 +312,47 @@ Números tirados do banco no dia, para priorizar pelo dano real e não pela grav
 | [S11](03-defeitos-e-riscos.md) teto zero | **2 produtos ativos** com teto 0: `ESCOLTA` e `COLUNA 21M EMINEX` | Real, mas de alcance pequeno hoje. Numa compra observada de R$ 14.912, o `teto_pontos_compra` do nível (50) cortou o total muito antes, mascarando a inflação |
 | [S6](03-defeitos-e-riscos.md) duas fórmulas | Na mesma compra, a soma dos itens gravada pelo TypeScript dá **124,13** e o lote tem **50** | Confirmado. Parte da diferença é o teto do nível, parte é a divergência de fórmula |
 | S12 faixa de streak | 0 clientes fora de faixa hoje, mas 1 lojista com teto de faixa em 3 e clientes ativos | Bomba-relógio: não dá erro hoje, derruba a venda amanhã |
+
+---
+
+## S13 · Crítico · O portal admin entrega um tenant que não funciona
+
+**Nada no sistema cria um `programas_fidelidade`.** Nem `POST /api/admin/lojistas`, nem a tela
+de configurações do lojista — `configuracoes.ts` só lê e atualiza, e a rota
+`POST /api/lojista/configuracoes` recusa qualquer `type` diferente de `"nivel"`.
+
+Cadeia para todo lojista criado pelo portal:
+
+1. `getConfiguracoes` devolve `{ programa: null, niveis: [] }`; a tela de configuração abre
+   vazia e sem nenhum caminho para resolver;
+2. sem programa não há nível;
+3. na primeira venda, `fn_programa_ativo` lança `Nenhum programa de fidelidade ativo
+   encontrado para o lojista X` e o lançamento **falha**.
+
+Os dois programas que existem em produção foram criados à mão pelo Studio — é por isso que o
+defeito nunca apareceu: nenhum tenant foi criado pelo portal e usado em seguida.
+
+**Correção:** provisionar programa e nível inicial junto com o lojista, com o nível nascendo
+com `streak_max = null` para satisfazer a invariante de cobertura desde o primeiro segundo.
+Contrato em [contratos/provisionamento-e-acesso.md](contratos/provisionamento-e-acesso.md).
+
+---
+
+## S14 · Alto · O caminho `?code=` do primeiro acesso não pode funcionar
+
+`primeiro-acesso-form.tsx` tenta `exchangeCodeForSession(code)` quando a URL traz `?code=`. O
+projeto usa `@supabase/ssr`, cujo `flowType` padrão é **PKCE**, e no PKCE quem inicia o fluxo
+guarda um `code_verifier` no próprio navegador. O link do convite é gerado **no servidor** e
+enviado para **outra pessoa** — esse verificador não existe em lugar nenhum.
+
+O que segura o fluxo hoje é o segundo ramo, o do `#access_token`, que tem problemas próprios:
+fragmento não chega ao servidor (o middleware não vê sessão até o JavaScript rodar) e o token
+fica no histórico do navegador.
+
+**Correção:** `generateLink` devolve `properties.hashed_token`; montar o link para uma rota
+`/auth/confirmar` que chame `verifyOtp({ type: "recovery", token_hash })` no servidor. Ver o
+contrato.
+
+Relacionado ao já registrado em [contratos/admin.md](contratos/admin.md): `resetPasswordForEmail`
+chamado logo depois de `generateLink` emite um segundo token e invalida o primeiro, que é o que
+foi para o WhatsApp.

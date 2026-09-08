@@ -218,3 +218,109 @@ caso que o piloto mais tem: compra mista com muitos itens.
 
 **Recomendação: trocar para `floor` no total**, mantendo o percentual por item. Nada da regra 4
 se perde e a regra 1 para de ser corroída pelo arredondamento.
+
+---
+
+# Rodada 3 — respostas de 08/set/2026
+
+| # | Resolução |
+|---|---|
+| **N2** | **Plano fiel.** `expira_em = data_compra + dias_expiracao_pontos`. Compra retroativa antiga nasce com lote já vencido, e isso é o comportamento correto: a pergunta que o lojista faz é "quantos pontos ele teria hoje". |
+| **N3** | **Criar o índice único parcial** `unique (lojista_id) where ativo`. Confirmado que não há lojista com dois programas ativos, então a migration não encontra obstáculo. |
+| **N4** | **`floor` sobre o total da compra**, mantendo o percentual por item. Motivo do Sérgio: fica mais fácil de explicar para o lojista. |
+| **N1** | **Continua aberta.** O ideal é lançamento por XML ou chave de acesso, mas falta desenho que funcione do lojista pequeno ao grande. Proposta abaixo. |
+
+## N1 — proposta de desenho
+
+> Proposta minha, não decidida. O objetivo é separar dois problemas que hoje estão colados e
+> por isso não têm solução única para todo porte de lojista.
+
+### A ideia central: identificar não é a mesma coisa que detalhar
+
+O que trava o desenho é tentar resolver, no mesmo instante, duas coisas de dificuldade muito
+diferente:
+
+1. **Identificar a compra** — qual nota é essa. Isso é fácil, uniforme e não depende de porte.
+2. **Obter os itens** — o que tem dentro dela. Isso é difícil e varia com o porte do lojista.
+
+A proposta é desacoplar: o cliente identifica na hora, os itens chegam depois, por um dos
+caminhos disponíveis para aquele lojista.
+
+### Passo 1 — o cliente informa a chave de acesso
+
+Por leitura do QR do cupom ou digitando os 44 dígitos. **A chave se autovalida**, sem consultar
+nada. O layout é fixo:
+
+| Posições | Conteúdo | Uso |
+|---|---|---|
+| 1–2 | código da UF | — |
+| 3–6 | AAMM da emissão | confere se a `data_compra` é plausível |
+| **7–20** | **CNPJ do emitente** | **confere se a nota é daquele lojista** |
+| 21–22 | modelo (55 NF-e, 65 NFC-e) | — |
+| 23–25 | série | — |
+| 26–34 | número da nota | — |
+| 35 | tipo de emissão | — |
+| 36–43 | código numérico | — |
+| 44 | dígito verificador (módulo 11) | rejeita chave digitada errada |
+
+Ou seja: **antes de qualquer integração**, só com os 44 dígitos, dá para recusar chave
+malformada, chave de outro lojista e data incoerente. Isso já elimina a maior parte do lixo, e
+funciona igual para o lojista de qualquer porte.
+
+A compra nasce `pendente`, com a chave gravada e **sem itens**, num estado novo: *aguardando
+detalhamento*. Ela não pontua nesse estado.
+
+### Passo 2 — os itens chegam pelo caminho que aquele lojista tiver
+
+Aqui o porte importa, e por isso são vários caminhos com a mesma saída. Em ordem de preferência:
+
+| Caminho | Para quem | Como |
+|---|---|---|
+| **XML já no sistema** | lojista com ERP | o lojista envia os XMLs que emite (upload em lote, ou integração). O sistema casa pela chave e detalha a compra **automaticamente** |
+| **XML avulso** | lojista pequeno com emissor | ao aprovar, o lojista arrasta o XML daquela nota |
+| **Consulta pública** | onde for viável | busca os itens pela chave no portal da SEFAZ da UF |
+| **Lojista digita** | último recurso | o fluxo de hoje, na tela de aprovação |
+
+O ponto é que **o lojista já tem o XML**: foi ele quem emitiu a nota. Não é preciso extrair
+nada do cliente além do identificador. Isso inverte o problema — em vez de perguntar "como o
+cliente manda os itens", pergunta-se "como o lojista entrega o que já tem".
+
+### Passo 3 — casar item do XML com produto do catálogo
+
+O XML traz `cProd`, que é **o código do produto no sistema do próprio lojista**. É a chave de
+correspondência exata que hoje não existe: `produtos` não tem código externo (só `clientes` tem
+`codigo_externo`).
+
+Proposta: `produtos` ganha `codigo_externo`, o importador de CSV/XLSX ganha essa coluna, e o
+casamento passa a ser por código em vez de por descrição. Item sem correspondência fica
+pendente para o lojista resolver na aprovação — e a resolução pode cadastrar o produto na hora.
+
+### O que esta proposta NÃO resolve
+
+**A chave não prova que a nota é daquele cliente.** Ela prova que a nota é daquele lojista.
+Quem pegar um cupom descartado consegue reivindicar os pontos. Três defesas, em camadas:
+
+1. a aprovação do lojista já é obrigatória (promessa 6 do plano) — é o controle principal;
+2. unicidade de `(lojista_id, chave_acesso)`, para a mesma nota não ser reivindicada duas vezes;
+3. quando o XML estiver disponível, conferir automaticamente o CNPJ/CPF do **destinatário**
+   contra o documento do cliente — aí a validação vira forte e a aprovação vira formalidade.
+
+A defesa 3 só funciona onde há XML e onde a nota é nominal. Em cupom sem identificação do
+consumidor, não há como provar — e nesse caso o julgamento do lojista é a única defesa
+possível, o que já era verdade antes de qualquer sistema.
+
+### Por que isso resolve a variação de porte
+
+O lojista pequeno começa no caminho mais manual e não fica bloqueado: o cliente lança, ele
+confere e completa. O lojista grande liga a entrega de XML uma vez e o fluxo inteiro fica
+automático. **O contrato da compra é o mesmo nos dois casos** — muda só quem preenche os itens
+e quando. Nenhum dos dois exige que o outro exista.
+
+### O que precisa ser decidido para destravar o contrato
+
+1. O estado *aguardando detalhamento* entra no `compra_status`, ou a compra pendente sem itens
+   já cobre isso?
+2. `produtos.codigo_externo` entra nesta rodada?
+3. Consulta pública à SEFAZ entra no escopo ou fica para depois? É a parte mais cara e a que
+   mais varia por UF.
+4. A unicidade de `(lojista_id, chave_acesso)` bloqueia ou só alerta?

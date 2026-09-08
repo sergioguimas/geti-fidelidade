@@ -43,8 +43,9 @@ use service role, ou ganhar checagem interna de tenant.
 > Corrigido pela mesma migration. As seis policies `USING (true)` foram dropadas e
 > `lojistas` — que só tinha aquela — ganhou `lojistas_select_own_ou_admin`, cobrindo os dois
 > acessos legítimos que existem no código: o lojista lendo o próprio registro e o admin
-> listando todos. **Não foi possível testar os caminhos autenticados** (não tenho login);
-> pede um clique de verificação.
+> listando todos. **Verificado pelo Sérgio em 08/set**: login do lojista e liberação de acesso
+> de cliente funcionam — os dois caminhos autenticados que a mudança de policy poderia ter
+> quebrado. Correção fechada.
 
 Além das policies por lojista, existem policies permissivas assim:
 

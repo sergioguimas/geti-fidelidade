@@ -7,4 +7,5 @@ export * from "./comum";
 export * from "./produtos";
 export * from "./premios";
 export * from "./programa-niveis";
+export * from "./motor-pontos";
 export * from "./admin";

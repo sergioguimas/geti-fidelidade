@@ -80,7 +80,7 @@ código e a mensagem que o usuário deve ver.
 | [premios.md](premios.md) | AS-IS com pontos TO-BE | — |
 | [programa-e-niveis.md](programa-e-niveis.md) | **TO-BE** | — |
 | [admin.md](admin.md) | AS-IS | — |
+| [motor-de-pontos.md](motor-de-pontos.md) | **TO-BE** | parcial: o que envolve compra do cliente espera N1 |
 
 Fora desta rodada, esperando decisão: **compras** e **aprovação** (bloqueados por N1),
-**resgate** e **área do cliente** (bloqueados por N1 e R3), **motor de pontos** (depende de
-N2 e N4).
+**resgate** e **área do cliente** (bloqueados por N1 e R3).

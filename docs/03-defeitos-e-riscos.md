@@ -7,7 +7,13 @@ Ordenado por gravidade. O que exige decisão de negócio aparece também em
 
 ---
 
-## S1 · Crítico · Todas as funções do motor estão liberadas para `anon`
+## S1 · ✅ CORRIGIDO em 08/set/2026 · Todas as funções do motor estavam liberadas para `anon`
+
+> Corrigido pela migration `20260908191820_fecha_execucao_anonima_e_restaura_rls`.
+> Verificado contra produção: antes, `POST /rest/v1/rpc/fn_programa_ativo` com a chave
+> anônima executava a função e devolvia erro de negócio (`P0001`); depois, devolve
+> `42501 permission denied`. **Continua pendente** a checagem de tenant dentro das quatro
+> funções que a aplicação chama com sessão de usuário — ver S1.1.
 
 Toda função PL/pgSQL do schema `public` tem `GRANT ALL ... TO anon`. Como o PostgREST expõe
 `POST /rest/v1/rpc/<função>` e a chave anônima está no bundle do navegador, qualquer pessoa
@@ -32,7 +38,13 @@ use service role, ou ganhar checagem interna de tenant.
 
 ---
 
-## S2 · Crítico · RLS de multi-tenant está anulada em 6 tabelas
+## S2 · ✅ CORRIGIDO em 08/set/2026 · RLS de multi-tenant estava anulada em 6 tabelas
+
+> Corrigido pela mesma migration. As seis policies `USING (true)` foram dropadas e
+> `lojistas` — que só tinha aquela — ganhou `lojistas_select_own_ou_admin`, cobrindo os dois
+> acessos legítimos que existem no código: o lojista lendo o próprio registro e o admin
+> listando todos. **Não foi possível testar os caminhos autenticados** (não tenho login);
+> pede um clique de verificação.
 
 Além das policies por lojista, existem policies permissivas assim:
 
@@ -169,3 +181,42 @@ comprometeu". Ver D4.
   `src/lib/merchant/clientes.ts`.
 - `compras.valor_total` e `subtotal_bruto` são calculados no TypeScript e nunca conferidos
   contra a soma dos itens no banco.
+
+
+---
+
+## S1.1 · Alto · PENDENTE · Falta checagem de tenant nas 4 RPCs que o app chama
+
+A migration de 08/set fechou o acesso anônimo, mas manteve `EXECUTE` para `authenticated` em
+`fn_processar_compra`, `fn_prever_cancelamento_compra`, `fn_cancelar_compra_com_compensacao` e
+`fn_processar_status_resgate`, porque é assim que a aplicação as chama (com a sessão do
+usuário). Como as três primeiras são `SECURITY DEFINER`, **qualquer usuário logado — inclusive
+um cliente final — ainda consegue chamá-las com o UUID de um registro de outro lojista.**
+
+A correção é uma guarda no topo de cada uma:
+
+```sql
+if not public.fn_pode_operar_lojista(v_compra.lojista_id) then
+  raise exception 'Acesso negado' using errcode = '42501';
+end if;
+```
+
+com um helper que libera quando não há JWT (pg_cron, service role) e, havendo, exige vínculo
+em `lojistas_usuarios` ou admin ativo.
+
+Não foi aplicada junto porque muda o corpo das funções do motor e o modo de falha — lojista
+sem conseguir lançar venda — só aparece em tela logada, que eu não consigo testar. Deve ir
+junto com um teste manual, ou dentro da rodada de contratos.
+
+---
+
+## S10 · Médio · A lista de clientes do painel admin já vem vazia
+
+`GET /api/admin/clientes` lê a tabela `clientes` com a **sessão do admin**, mas todas as
+policies de `clientes` exigem vínculo em `lojistas_usuarios` — e um admin da plataforma não
+tem esse vínculo. A consulta retorna `[]` sempre.
+
+Isso é anterior à migration de 08/set e **não foi alterado por ela**: nenhuma das seis policies
+dropadas era de `clientes`. Corrigir exige uma policy de leitura para admin, o que é mudança
+de comportamento do painel (a tela passa a mostrar dados que hoje não mostra) — por isso ficou
+de fora da migration de segurança e entra como decisão de escopo.

@@ -5,6 +5,15 @@ chutar. Formato: o que está em jogo, as opções, e a recomendação com o cust
 
 Status: 🔴 aberto · 🟢 decidido (registrar a decisão e a data aqui quando fechar).
 
+## Decisões fechadas em 08/set/2026
+
+| # | Decisão | Consequência imediata |
+|---|---|---|
+| **D9** | **Híbrido por área.** AS-IS onde já funciona (CRUD do lojista, produtos, importação, admin); TO-BE onde está quebrado (motor de pontos, expiração, resgate, área do cliente, segurança). | Cada contrato precisa declarar no cabeçalho se é AS-IS ou TO-BE, para o Sonnet saber se está descrevendo ou corrigindo. |
+| **D5** | **O cálculo de pontos mora só no Postgres.** O TypeScript grava os itens e lê de volta o que o banco calculou; `buildCompraItens` para de calcular pontos. | As colunas `compra_itens.percentual_aplicado` e `pontos_gerados` passam a ser preenchidas pelo banco. Some a prévia de pontos calculada no cliente — ver Q1 abaixo. |
+| **D3** | **Cliente é global da plataforma**, participando de N programas via `clientes_fidelidade`. | `clientes.lojista_id` é dropada; RLS de `clientes` passa a derivar de `clientes_fidelidade`. Abre questão de privacidade entre tenants — ver Q2. |
+| **D10** | **A área do cliente entra nesta rodada de contratos**, mesmo que a implementação venha depois. | Os contratos de saldo, extrato e resgate precisam servir aos dois públicos desde já. |
+
 ---
 
 ## D1 🔴 Ponto de entrada da pontuação: trigger ou RPC?
@@ -51,7 +60,9 @@ gatilho manual para suporte.
 
 ---
 
-## D3 🔴 Cliente é global da plataforma ou de cada lojista?
+## D3 🟢 Cliente é global da plataforma ou de cada lojista?
+
+> **Decidido em 08/set/2026.** Ver a tabela no topo deste arquivo.
 
 O schema afirma as duas coisas: `clientes` tem `lojista_id`, e `clientes_fidelidade` é o N:N
 cliente×lojista. O código busca cliente global por CNPJ com service role, mas a RLS de
@@ -82,7 +93,9 @@ schema em `clientes_fidelidade` e revisão de toda tela que hoje lê `saldo_pend
 
 ---
 
-## D5 🔴 Onde mora o cálculo de pontos?
+## D5 🟢 Onde mora o cálculo de pontos?
+
+> **Decidido em 08/set/2026.** Ver a tabela no topo deste arquivo.
 
 Hoje mora em dois lugares que discordam ([S6](03-defeitos-e-riscos.md)).
 
@@ -146,7 +159,9 @@ Essa segunda parte é regra de negócio nova e precisa de resposta explícita.
 
 ---
 
-## D9 🔴 Os contratos descrevem o sistema atual ou o sistema alvo?
+## D9 🟢 Os contratos descrevem o sistema atual ou o sistema alvo?
+
+> **Decidido em 08/set/2026.** Ver a tabela no topo deste arquivo.
 
 - **(a) AS-IS congelado.** Contrato documenta o comportamento de hoje, bugs inclusive; as
   correções viram mudanças de contrato depois, uma a uma.
@@ -160,7 +175,9 @@ precisa ser feita por área e não de uma vez.
 
 ---
 
-## D10 🔴 A área do cliente entra nesta rodada?
+## D10 🟢 A área do cliente entra nesta rodada?
+
+> **Decidido em 08/set/2026.** Ver a tabela no topo deste arquivo.
 
 Hoje é fachada com JSON hardcoded. Ela é o que puxa D3 (cliente global), D4 (semântica de
 pendente) e D7 (quem pede resgate).
@@ -223,3 +240,46 @@ São dois buracos abertos agora, num banco com dados reais de beta. A correção
 Custo: precisa de um teste manual das telas depois de aplicar, porque a tabela `lojistas` só
 tem a policy permissiva — dropá-la sem colocar outra no lugar quebra a leitura do próprio
 lojista.
+
+---
+
+# Perguntas abertas pelas decisões de 08/set
+
+## Q1 🔴 Com o cálculo só no Postgres, a tela de vendas ainda mostra prévia de pontos?
+
+Hoje o lojista vê os pontos por item enquanto monta a venda, porque o TypeScript calcula. Com
+D5, esse número deixa de existir antes de salvar.
+
+- **(a)** Sem prévia: o lojista salva e só então vê os pontos gerados.
+- **(b)** Prévia por round-trip: uma função `fn_simular_pontos(itens jsonb)` no banco, chamada
+  a cada mudança da tela. Mesma fórmula, uma implementação só, custo de latência.
+- **(c)** Voltar a duplicar a fórmula em TS só para prévia (a opção (c) do D5).
+
+**Recomendação: (b).** Preserva a UX sem reabrir a divergência do [S6](03-defeitos-e-riscos.md).
+
+## Q2 🔴 Com cliente global, o que um lojista enxerga de um cliente cadastrado por outro?
+
+Cenário: o cliente com CNPJ X já existe porque a Loja A o cadastrou. A Loja B digita o mesmo
+CNPJ.
+
+- **(a)** A Loja B vê nome/telefone/e-mail já preenchidos (é o que o código faz hoje, com
+  service role).
+- **(b)** A Loja B só vê que o CNPJ existe e precisa preencher os próprios dados de contato.
+- **(c)** A Loja B cria um vínculo sem ver nada; os dados de contato ficam no cadastro global,
+  visíveis apenas ao cliente.
+
+Em qualquer opção, compras, saldo e extrato **nunca** cruzam entre lojistas — isso é invariante,
+não decisão. A questão é só sobre dado cadastral. Tem impacto direto de LGPD: (a) é
+compartilhamento de dado pessoal entre controladores distintos sem base legal óbvia.
+
+**Recomendação: (b).** Preserva a dedupe (não cria CNPJ duplicado) sem vazar contato entre
+lojistas.
+
+## Q3 🔴 Como o cliente final ganha acesso à área dele?
+
+- **(a)** Só o lojista libera (`pode_fazer_login`), como já é hoje.
+- **(b)** Auto-cadastro: o cliente se registra e vincula-se a lojistas por código/QR.
+- **(c)** Os dois.
+
+**Recomendação: (a) nesta rodada.** Auto-cadastro traz verificação de identidade, anti-abuso e
+onboarding — é produto novo, não refatoração.

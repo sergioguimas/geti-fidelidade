@@ -24,7 +24,7 @@ O histórico das opções consideradas e do custo de cada uma está no git log d
 | **D3** | **Cliente é uma identidade global** da plataforma, participando de N programas. | `clientes.lojista_id` sai; o vínculo passa a ser `clientes_fidelidade`. |
 | **D3.1** | **Isolamento total entre lojistas.** A Loja A não sabe quem são os clientes da Loja B. O cadastro global existe **só** para o sistema garantir que a mesma pessoa não tenha dois logins. | Os dados cadastrais (nome, telefone, e-mail) passam a ser por lojista; a identidade global guarda apenas documento e usuário de autenticação. Isso divide a tabela `clientes` em duas — ver **R3**. |
 | **D5** | **O cálculo de pontos mora só no Postgres.** O TypeScript grava os itens e lê de volta o que o banco calculou. | `buildCompraItens` para de calcular pontos; `compra_itens.percentual_aplicado` e `pontos_gerados` passam a ser preenchidos pelo banco. |
-| **D6** | **Mais de um programa ativo é permitido** — não deve virar prática comum, mas a possibilidade tem que existir. | Cancela a ideia de índice único parcial. `fn_programa_ativo`, que hoje devolve um único programa com `limit 1`, precisa ser repensada. Escopo exato depende de **R4**. |
+| **D6** | ~~Mais de um programa ativo é permitido~~ → **REVOGADA por R4 em 08/set:** multi-programa está fora de escopo. Volta a valer **um único programa ativo por lojista**. | `fn_programa_ativo` com `limit 1` deixa de ser ambiguidade. Falta decidir se vale travar por constraint — ver **N3**. |
 | **D10** | **A área do cliente entra nesta rodada de contratos**, mesmo que a implementação venha depois. | Contratos de saldo, extrato e resgate servem aos dois públicos desde já. |
 
 ### Fluxo de compra
@@ -145,3 +145,76 @@ A diferença é só onde a fração é descartada. Com 10 itens de R$ 9,99 a 5%,
 dá 0 pontos e a segunda dá 4. A perda é sempre contra o cliente e cresce com o número de itens.
 Mantendo D5.1 como está, o comportamento é intencional e o contrato vai registrá-lo assim — é
 só confirmar que era isso mesmo.
+
+---
+
+# Rodada 2 — respostas de 08/set/2026
+
+Origem das regras: [00-plano-de-negocio.md](00-plano-de-negocio.md).
+
+| # | Resolução |
+|---|---|
+| **R1** | **A compra do cliente vem de nota ou cupom e traz todos os itens individualmente.** Fecha a opção (b): o lote pendente nasce com os pontos já calculados, não com zero. Abre a questão de mapeamento de item — **N1**. |
+| **R2 (ii)** | **Compra retroativa é lançada uma a uma**, mesmo dentro de uma importação em lote, para que a evolução de nível seja registrada e evolua a cada compra. Ou seja: a importação é um laço cronológico sobre o fluxo normal, não um caminho paralelo. `expira_em` continua indefinido — **N2**. |
+| **R3** | **Suspensa.** Onde fica o dado cadastral sob isolamento total continua em aberto, a ser retomado depois da conversa de negócio. Até lá, nenhum contrato pode assumir a divisão `pessoas`/`clientes`. |
+| **R4** | **Multi-programa está fora de escopo.** Não estava no escopo original e o custo supera o benefício. Volta a valer um único programa ativo por lojista, e a `fn_programa_ativo` com `limit 1` deixa de ser ambiguidade — **N3** só pergunta se vale travar isso por constraint. |
+| **R5** | **Abatimento de dívida:** o cliente vê que ganhou X e que X foi usado no abatimento, com a movimentação de quitação no histórico. Por padrão **100%** dos pontos da compra vão para o abatimento. A dívida **não prescreve**. |
+| **R6** | Pendente da recomendação abaixo, agora que o plano de negócio está escrito — **N4**. |
+
+## N1 🔴 Como o item da nota vira um `produtos.id` do lojista?
+
+`compra_itens.produto_id` é `NOT NULL` e aponta para o catálogo do lojista. A nota do cliente
+traz descrições do documento fiscal, que não são as descrições cadastradas. Sem uma regra de
+correspondência, a compra do cliente não pontua.
+
+- **(a) Importação do XML/QR da nota**, casando item por código. Exige `produtos` ganhar um
+  código externo (hoje não tem — só `clientes` tem `codigo_externo`).
+- **(b) Cliente escolhe do catálogo** enquanto digita a nota. Expõe a lista de produtos e os
+  tetos.
+- **(c) Cliente digita livre e o lojista casa na aprovação.** Move o trabalho para o lojista, o
+  que conflita com a promessa 6, em que ele só "verifica e aprova".
+- **(d) Item não reconhecido cai num produto genérico** com teto padrão do programa.
+
+Vale a pena decidir isto junto com uma pergunta anterior: qual documento o cliente anexa — foto,
+PDF, chave de acesso, QR? Você já tem automação de NF-e em outros projetos, o que torna (a)
+mais barato aqui do que pareceria.
+
+## N2 🔴 Pontos retroativos nascem expirados?
+
+Com validade de 180 dias, a compra importada de 11 meses atrás já nasce vencida. As duas
+leituras são defensáveis e o plano de negócio não decide entre elas:
+
+- **Fiel** — `expira_em = data_compra + validade`. Responde honestamente "quantos pontos ele
+  teria hoje", e boa parte do histórico importado nasce sem saldo.
+- **Promocional** — o histórico serve para posicionar o cliente no nível certo, e os pontos
+  valem a partir da importação.
+
+Recomendação: **fiel**, com o lojista podendo escolher importar "só para nível" (reconstrói
+streak e nível sem gerar lote). Preserva a honestidade do número e ainda entrega o efeito de
+migração que motiva o lojista.
+
+## N3 🟡 Travar um programa ativo por lojista com constraint?
+
+Com R4, multi-programa saiu de escopo. Um índice único parcial
+(`unique (lojista_id) where ativo`) transforma o `limit 1` de hoje, que escolhe silenciosamente,
+em erro explícito. Recomendo criar. Custo: se já houver lojista com dois programas ativos em
+produção, a migration falha e exige limpeza antes — o que, por si só, é informação útil.
+
+## N4 🔴 O `floor` à luz da promessa 1 — recomendação revista
+
+O plano diz que **quanto mais o cliente compra, mais ele arrecada**, e que o teto por produto
+existe para proteger margem. As duas coisas continuam valendo com o `floor` no total:
+
+```
+Σ floor(subtotal_i × pct_i / 100)     -- hoje: trunca cada item
+floor( Σ subtotal_i × pct_i / 100 )   -- alternativa: trunca uma vez
+```
+
+O percentual continua sendo por item nas duas. A diferença é só onde a fração morre. Numa cesta
+mista do piloto — 12 itens de revenda a 2% e 3 de fabricação a 8% — a versão por item pode
+descartar mais de 10 pontos por compra, sempre contra o cliente, e uma cesta de itens baratos
+pode fechar em zero mesmo com total relevante. Isso trabalha contra a promessa 1 exatamente no
+caso que o piloto mais tem: compra mista com muitos itens.
+
+**Recomendação: trocar para `floor` no total**, mantendo o percentual por item. Nada da regra 4
+se perde e a regra 1 para de ser corroída pelo arredondamento.

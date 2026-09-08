@@ -5,6 +5,7 @@ Estes documentos são o **terreno** para a esteira
 
 | Arquivo | O que é | Fase |
 |---|---|---|
+| [00-plano-de-negocio.md](00-plano-de-negocio.md) | O que o produto promete e por que a arquitetura ficou como ficou. **Fonte das regras** — se o código divergir, o código está errado | Origem |
 | [01-mapa-atual.md](01-mapa-atual.md) | Inventário do que existe hoje: superfícies, camadas, o que é real e o que é fachada | AS-IS |
 | [02-motor-de-pontos-as-is.md](02-motor-de-pontos-as-is.md) | O motor de pontos destrinchado como ele **é**, não como o README diz que é | AS-IS |
 | [03-defeitos-e-riscos.md](03-defeitos-e-riscos.md) | Defeitos confirmados contra o banco de produção, ordenados por gravidade | AS-IS |

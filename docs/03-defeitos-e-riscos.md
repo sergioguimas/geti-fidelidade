@@ -220,3 +220,40 @@ Isso é anterior à migration de 08/set e **não foi alterado por ela**: nenhuma
 dropadas era de `clientes`. Corrigir exige uma policy de leitura para admin, o que é mudança
 de comportamento do painel (a tela passa a mostrar dados que hoje não mostra) — por isso ficou
 de fora da migration de segurança e entra como decisão de escopo.
+
+---
+
+## S11 · Crítico para o negócio · Teto de produto igual a zero pontua o máximo
+
+Descoberto ao confrontar o motor com a promessa 4 do [plano de negócio](00-plano-de-negocio.md).
+Trecho real de `fn_processar_compra`, linha 764 do baseline:
+
+```sql
+v_teto_produto := coalesce(v_item.teto_percentual, 0);
+
+if v_teto_produto > 0 then
+  v_percentual_item := least(v_teto_produto, v_nivel.percentual_conversao);
+else
+  v_percentual_item := v_nivel.percentual_conversao;   -- <== teto 0 vira percentual cheio
+end if;
+```
+
+O lojista que cadastra um produto com `teto_percentual = 0` está dizendo "este item não
+bonifica". O motor entende o contrário e aplica o percentual **integral** do nível — o máximo
+possível. Um item de revenda de margem zero passa a ser o item que mais pontua da loja.
+
+O zero é um valor perfeitamente cadastrável: o CHECK da tabela aceita `>= 0`, o formulário
+aceita, e o importador de CSV/XLSX também.
+
+**Impacto direto na promessa 4.** O teto por produto existe justamente para o piloto não
+pontuar acima da margem em item de revenda. No caso extremo — margem zero — o sistema faz
+exatamente o oposto do contratado.
+
+**Correção:** `least(coalesce(teto_produto, nivel.percentual_conversao), nivel.percentual_conversao)`,
+tratando **nulo** como "sem teto próprio, usa o do nível" e **zero** como "não pontua". Isso
+exige distinguir os dois no schema: hoje `produtos.teto_percentual` é `NOT NULL`, então não há
+como expressar "sem teto". Vira decisão de contrato.
+
+**Antes de corrigir, conferir os dados:** se algum produto em produção já está com teto zero,
+os lotes gerados por ele foram inflados. Vale um levantamento de quantos produtos estão nessa
+condição e de quantas compras foram afetadas.

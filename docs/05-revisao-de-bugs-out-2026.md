@@ -316,7 +316,8 @@ A solução definitiva continua sendo a rota `/auth/confirmar` com `verifyOtp` (
 
 ### S15 · 🔴 Alto · NOVO · `authenticated` ainda executa funções DEFINER que o app nunca chama
 
-> **Migration preparada em 07/out/2026:** `20261007120000_revoga_funcoes_definer_internas.sql`
+> **✅ Aplicada em produção em 07/out/2026:** `20261007114742_revoga_funcoes_definer_internas.sql`
+> (verificado: `authenticated` sem EXECUTE nas três, `service_role` e `postgres` mantidos)
 > revoga `fn_registrar_movimentacao_pontos`, `fn_expirar_lotes` e `fn_calcular_streak_cliente`.
 > **`fn_garantir_cliente_fidelidade` ficou de fora:** o mapa de chamadas em produção mostrou que
 > `fn_processar_status_resgate` (INVOKER, chamada pelo app) → `fn_rebuild_cliente_fidelidade`

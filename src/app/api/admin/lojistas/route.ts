@@ -2,12 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireAdminApi } from "@/lib/admin/api-auth";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { NIVEL_INICIAL, PROGRAMA_INICIAL } from "@/contracts/acesso";
+import { enviarConvite } from "@/lib/admin/convite";
 
 function normalizeCnpj(value: string) {
-  return value.replace(/\D/g, "");
-}
-
-function normalizePhone(value: string) {
   return value.replace(/\D/g, "");
 }
 
@@ -49,7 +46,6 @@ export async function POST(request: NextRequest) {
     const nomeFantasia = nomeFantasiaInput || razaoSocial;
     const nomeResponsavel = String(body.nomeResponsavel ?? "").trim() || null;
     const telefone = String(body.telefone ?? "").trim() || null;
-    const telefoneNormalizado = telefone ? normalizePhone(telefone) : null;
     const cnpj = normalizeCnpj(String(body.cnpj ?? "").trim());
     const endereco = String(body.endereco ?? "").trim() || null;
     const email = String(body.email ?? "").trim().toLowerCase() || null;
@@ -246,77 +242,13 @@ export async function POST(request: NextRequest) {
     }
 
     // ================= LINK DE PRIMEIRO ACESSO =================
-    //
-    // O GoTrue guarda UM token de recuperação por usuário. O código anterior
-    // gerava o link, mandava no WhatsApp e logo depois chamava
-    // resetPasswordForEmail — o que emitia um segundo token e matava o link
-    // recém-enviado. Agora só existe um emissor por vez.
 
-    const redirectTo = `${process.env.NEXT_PUBLIC_APP_URL}/primeiro-acesso`;
-    const podeWhatsapp = Boolean(
-      telefoneNormalizado && process.env.N8N_WEBHOOK_WHATSAPP
-    );
-
-    let conviteEnviadoPor: "whatsapp" | "email" | "nenhum" = "nenhum";
-
-    if (podeWhatsapp) {
-      const { data: linkData, error: linkError } =
-        await supabaseAdmin.auth.admin.generateLink({
-          type: "recovery",
-          email: loginEmail,
-          options: { redirectTo },
-        });
-
-      const actionLink = linkData?.properties?.action_link;
-
-      if (linkError || !actionLink) {
-        console.error("Erro ao gerar link de primeiro acesso:", linkError);
-      } else {
-        const mensagem = `Olá ${nomeResponsavel ?? nomeFantasia}! 👋
-
-Sua conta foi criada no sistema de fidelidade.
-
-Para acessar pela primeira vez e definir sua senha:
-👉 ${actionLink}
-
-Se não foi você, ignore esta mensagem.`;
-
-        try {
-          await fetch(process.env.N8N_WEBHOOK_WHATSAPP!, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              telefone: telefoneNormalizado,
-              mensagem,
-              // Para o fluxo do N8N poder mandar o MESMO link por e-mail.
-              // Enquanto ele não tratar estes campos, o e-mail não sai — e é
-              // por isso que o caminho sem telefone abaixo continua existindo.
-              email: loginEmail,
-              assunto: "Seu acesso ao sistema de fidelidade",
-            }),
-          });
-
-          conviteEnviadoPor = "whatsapp";
-        } catch (err) {
-          console.warn("Falha ao enviar WhatsApp via N8N:", err);
-        }
-      }
-    }
-
-    // Sem WhatsApp disponível, ou com falha no envio: o e-mail do Supabase é o
-    // único canal. Chamar aqui é seguro porque nenhum link foi entregue —
-    // invalidar o token anterior não tira nada de ninguém.
-    if (conviteEnviadoPor !== "whatsapp") {
-      try {
-        await supabaseAdmin.auth.resetPasswordForEmail(loginEmail, {
-          redirectTo,
-        });
-
-        conviteEnviadoPor = "email";
-      } catch (err) {
-        console.warn("Falha ao enviar email de primeiro acesso:", err);
-      }
-    }
+    const conviteEnviadoPor = await enviarConvite(supabaseAdmin, {
+      loginEmail,
+      telefone,
+      nomeDestinatario: nomeResponsavel ?? nomeFantasia,
+      tipo: "criacao",
+    });
 
     // ================= RESPONSE =================
 

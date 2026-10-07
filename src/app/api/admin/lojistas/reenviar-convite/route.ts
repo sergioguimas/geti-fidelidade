@@ -1,10 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAdminApi } from "@/lib/admin/api-auth";
 import { createAdminClient } from "@/lib/supabase/admin";
-
-function normalizePhone(value: string) {
-  return value.replace(/\D/g, "");
-}
+import { enviarConvite } from "@/lib/admin/convite";
 
 export async function POST(request: NextRequest) {
   try {
@@ -60,84 +57,21 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const redirectTo = `${process.env.NEXT_PUBLIC_APP_URL}/primeiro-acesso`;
+    const conviteEnviadoPor = await enviarConvite(supabaseAdmin, {
+      loginEmail,
+      telefone: lojista.telefone,
+      nomeDestinatario: lojista.nome_responsavel ?? lojista.nome_fantasia,
+      tipo: "reenvio",
+    });
 
-    const { data: linkData, error: linkError } =
-      await supabaseAdmin.auth.admin.generateLink({
-        type: "recovery",
-        email: loginEmail,
-        options: {
-          redirectTo,
+    if (conviteEnviadoPor === "nenhum") {
+      return NextResponse.json(
+        {
+          error:
+            "Não foi possível enviar o convite por WhatsApp nem por e-mail. Tente novamente em alguns minutos.",
         },
-      });
-
-    if (linkError) {
-      console.error("Erro ao gerar link de recovery:", linkError);
-      return NextResponse.json(
-        { error: "Erro ao gerar link de acesso." },
-        { status: 500 }
+        { status: 502 }
       );
-    }
-
-    const actionLink = linkData?.properties?.action_link;
-
-    if (!actionLink) {
-      return NextResponse.json(
-        { error: "Não foi possível gerar o link de acesso." },
-        { status: 500 }
-      );
-    }
-
-    // Um emissor de token por vez: o GoTrue guarda UM token de recuperação por
-    // usuário, então mandar por WhatsApp e depois chamar resetPasswordForEmail
-    // matava o link recém-enviado.
-    let enviadoPorWhatsapp = false;
-
-    if (lojista.telefone && process.env.N8N_WEBHOOK_WHATSAPP) {
-      const telefone = normalizePhone(lojista.telefone);
-
-      const mensagem = `Olá ${
-        lojista.nome_responsavel ?? lojista.nome_fantasia
-      }! 👋
-
-Reenvio de acesso ao sistema de fidelidade.
-
-Para definir sua senha e acessar:
-👉 ${actionLink}
-
-Se não foi você, ignore esta mensagem.`;
-
-      try {
-        await fetch(process.env.N8N_WEBHOOK_WHATSAPP, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            telefone,
-            mensagem,
-            // Para o fluxo do N8N mandar o MESMO link por e-mail.
-            email: loginEmail,
-            assunto: "Seu acesso ao sistema de fidelidade",
-          }),
-        });
-
-        enviadoPorWhatsapp = true;
-      } catch (err) {
-        console.warn("Falha ao enviar WhatsApp via N8N:", err);
-      }
-    }
-
-    // Só quando nada foi entregue pelo WhatsApp: aí invalidar o token gerado
-    // acima não tira nada de ninguém.
-    if (!enviadoPorWhatsapp) {
-      try {
-        await supabaseAdmin.auth.resetPasswordForEmail(loginEmail, {
-          redirectTo,
-        });
-      } catch (err) {
-        console.warn("Falha ao enviar email de recovery:", err);
-      }
     }
 
     return NextResponse.json({
@@ -145,6 +79,7 @@ Se não foi você, ignore esta mensagem.`;
       data: {
         lojistaId: lojista.id,
         loginEmail,
+        conviteEnviadoPor,
       },
     });
   } catch (error) {

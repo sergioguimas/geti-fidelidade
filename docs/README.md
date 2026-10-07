@@ -10,6 +10,7 @@ Estes documentos são o **terreno** para a esteira
 | [02-motor-de-pontos-as-is.md](02-motor-de-pontos-as-is.md) | O motor de pontos destrinchado como ele **é**, não como o README diz que é | AS-IS |
 | [03-defeitos-e-riscos.md](03-defeitos-e-riscos.md) | Defeitos confirmados contra o banco de produção, ordenados por gravidade | AS-IS |
 | [04-decisoes-em-aberto.md](04-decisoes-em-aberto.md) | As perguntas que precisam de resposta **antes** de escrever contrato | Decisão |
+| [05-revisao-de-bugs-out-2026.md](05-revisao-de-bugs-out-2026.md) | Revisão de 07/out/2026: bugs na criação de tenant e no que já é entregue, com plano de correção em rodadas | Bugs |
 
 Ainda não existem: `contratos/` (fase 2) e `specs/` (fase 3). Eles só devem ser escritos
 depois que [04-decisoes-em-aberto.md](04-decisoes-em-aberto.md) estiver respondido, porque

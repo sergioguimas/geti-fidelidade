@@ -168,6 +168,10 @@ impossível de salvar".
 
 ### T2 · 🔴 Alto · Falha do N8N vira "enviado por WhatsApp"
 
+> **✅ Corrigido em 07/out/2026** em `src/lib/admin/convite.ts` (`enviarConvite`), usado pelas duas
+> rotas: checa `res.ok`, timeout de 8 s, e só então cai no e-mail. Limite que fica: se o fluxo
+> do N8N responder 200 **antes** de enviar, falha posterior do WhatsApp não chega aqui.
+
 `src/app/api/admin/lojistas/route.ts:285` e `reenviar-convite/route.ts:460`:
 
 ```ts
@@ -186,6 +190,9 @@ o N8N travar, a rota trava junto até o limite da função na Vercel (ver T7).
 devolve o canal).
 
 ### T3 · 🔴 Alto · Falha do e-mail vira "enviado por e-mail"
+
+> **✅ Corrigido em 07/out/2026** no mesmo `enviarConvite`: o `{ error }` é checado; sem nenhum
+> canal a criação devolve `conviteEnviadoPor: "nenhum"` e o reenvio devolve 502.
 
 `route.ts:311` e `reenviar-convite/route.ts:484`:
 
@@ -206,6 +213,9 @@ erro. Conferir no painel do Supabase se há SMTP próprio configurado e se
 `${NEXT_PUBLIC_APP_URL}/primeiro-acesso` está em *Redirect URLs*.
 
 ### T4 · 🟡 Médio · O admin nunca fica sabendo que o convite não saiu
+
+> **Parte imediata feita em 07/out/2026:** criação e reenvio mostram o canal real, e a criação
+> avisa em vermelho quando o convite não saiu. Continua pendente a coluna de status fictícia.
 
 - `NovoLojistaDialog` ignora `conviteEnviadoPor` e sempre mostra "Lojista criado com sucesso."
   O caso `"nenhum"`, que a rota documenta como "o admin precisa usar o reenvio", é invisível.

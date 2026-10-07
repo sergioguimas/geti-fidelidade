@@ -3,11 +3,12 @@
 import { useEffect, useState } from "react";
 import { Building2, Mail, Phone, User, X } from "lucide-react";
 import type { AdminLojistaItem } from "./admin-lojistas-page";
+import type { CanalConvite } from "@/lib/admin/convite";
 
 type Props = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onCreated: (lojista: AdminLojistaItem) => void;
+  onCreated: (lojista: AdminLojistaItem, conviteEnviadoPor: CanalConvite) => void;
 };
 
 export function NovoLojistaDialog({ open, onOpenChange, onCreated }: Props) {
@@ -76,7 +77,7 @@ export function NovoLojistaDialog({ open, onOpenChange, onCreated }: Props) {
         throw new Error(payload?.error || "Erro ao criar lojista.");
       }
 
-      onCreated(payload.data.lojista);
+      onCreated(payload.data.lojista, payload.data.conviteEnviadoPor);
 
       setNomeFantasia("");
       setRazaoSocial("");

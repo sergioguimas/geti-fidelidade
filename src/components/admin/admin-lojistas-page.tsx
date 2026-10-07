@@ -12,6 +12,7 @@ import {
   UserCheck,
 } from "lucide-react";
 import { NovoLojistaDialog } from "./novo-lojista-dialog";
+import type { CanalConvite } from "@/lib/admin/convite";
 
 export type AdminLojistaItem = {
   id: string;
@@ -33,6 +34,11 @@ export type AdminLojistaItem = {
 
 type Props = {
   initialLojistas: AdminLojistaItem[];
+};
+
+const MENSAGEM_CANAL: Record<Exclude<CanalConvite, "nenhum">, string> = {
+  whatsapp: "Convite enviado por WhatsApp.",
+  email: "Convite enviado por e-mail.",
 };
 
 function formatDate(value?: string | null) {
@@ -176,7 +182,10 @@ export function AdminLojistasPage({ initialLojistas }: Props) {
         )
       );
 
-      setSuccess("Convite reenviado com sucesso.");
+      const canal = payload?.data?.conviteEnviadoPor as CanalConvite | undefined;
+      setSuccess(
+        canal && canal !== "nenhum" ? MENSAGEM_CANAL[canal] : "Convite reenviado."
+      );
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erro ao reenviar convite.");
     } finally {
@@ -184,11 +193,24 @@ export function AdminLojistasPage({ initialLojistas }: Props) {
     }
   }
 
-  function handleCreated(lojista: AdminLojistaItem) {
+  function handleCreated(
+    lojista: AdminLojistaItem,
+    conviteEnviadoPor: CanalConvite
+  ) {
     setLojistas((current) => [lojista, ...current]);
     setOpenNovo(false);
+
+    if (conviteEnviadoPor === "nenhum") {
+      // O lojista existe; só o convite não saiu. Não é motivo para desfazer.
+      setSuccess(null);
+      setError(
+        "Lojista criado, mas o convite NÃO foi enviado (WhatsApp e e-mail falharam). Use \"Reenviar convite\" em alguns minutos."
+      );
+      return;
+    }
+
     setError(null);
-    setSuccess("Lojista criado com sucesso.");
+    setSuccess(`Lojista criado com sucesso. ${MENSAGEM_CANAL[conviteEnviadoPor]}`);
   }
 
   return (

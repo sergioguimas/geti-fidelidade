@@ -82,6 +82,10 @@ saber se o link saiu de fato.
 
 ### P2 · 🟡 Médio · NOVO · Conta de teste é dona do lojista piloto
 
+> **Decisão em 07/out/2026:** a conta fica no Eminex por enquanto — o Sérgio usa para acompanhar
+> o cliente. Reavaliar quando houver papel de acompanhamento (somente leitura) ou acesso admin
+> ao painel do lojista.
+
 - `teste@empresa.com` tem vínculo **owner** em **Eminex** (o piloto, 125 clientes, 426
   vendas), com último login em 08/set. É uma conta de teste com acesso total a dados reais.
 - O lojista **Loja Teste** (`9f69ff2a`) não tem **nenhum** usuário vinculado: é um tenant
@@ -311,6 +315,13 @@ A solução definitiva continua sendo a rota `/auth/confirmar` com `verifyOtp` (
 ## 2. Segurança
 
 ### S15 · 🔴 Alto · NOVO · `authenticated` ainda executa funções DEFINER que o app nunca chama
+
+> **Migration preparada em 07/out/2026:** `20261007120000_revoga_funcoes_definer_internas.sql`
+> revoga `fn_registrar_movimentacao_pontos`, `fn_expirar_lotes` e `fn_calcular_streak_cliente`.
+> **`fn_garantir_cliente_fidelidade` ficou de fora:** o mapa de chamadas em produção mostrou que
+> `fn_processar_status_resgate` (INVOKER, chamada pelo app) → `fn_rebuild_cliente_fidelidade`
+> (INVOKER) → `fn_garantir_cliente_fidelidade` roda com o papel do usuário. Ela sai junto com o
+> S1.1. O SQL sugerido abaixo foi o rascunho anterior a essa checagem.
 
 A migration `20260908191820` revogou `EXECUTE` de `PUBLIC` e `anon`, mas o baseline tem
 `GRANT ALL ... TO authenticated` explícito em **todas** as funções, e esse grant continua.

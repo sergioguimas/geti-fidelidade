@@ -121,6 +121,10 @@ A dívida some. O livro-razão em `pontos_movimentacoes` mantém o registro, mas
 2. Mesmo que vencesse: `pg_cron` está instalado no banco **sem nenhum job cadastrado**, e a
    rota `POST /api/internal/expirar-lotes` não é chamada por ninguém.
 
+   > **Correção em 07/out/2026:** em produção existe o job `expirar-lotes-fidelidade-diario`
+   > (02:00 UTC, `select public.fn_expirar_lotes()`), ativo e rodando todo dia. O item 2 não
+   > vale; a expiração está morta só pelo item 1. Ver [05](05-revisao-de-bugs-out-2026.md).
+
 O mesmo padrão atinge o streak: a tela grava `dias_para_perder_streak`, e
 `fn_rebuild_cliente_fidelidade` usa `interval '30 days'` escrito no código.
 

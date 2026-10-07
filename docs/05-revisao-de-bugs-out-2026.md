@@ -5,10 +5,9 @@ com foco na **criação de novos tenants** e em defeitos do que já é entregue.
 ficaram de fora de propósito.
 
 **Como foi feito:** leitura de `src/` e das migrations versionadas
-(`supabase/migrations/*`, baseline de 08/set). **Não** houve consulta ao banco de produção —
-o projeto Supabase do geti-fidelidade não está entre os acessíveis nesta sessão — e o build
-não foi rodado (sem `node_modules`). Itens marcados *"confirmar"* dependem de um teste em tela
-ou de uma query em produção.
+(`supabase/migrations/*`, baseline de 08/set), e depois **consultas só de leitura no banco de
+produção** (projeto Supabase "Fidelidade") — ver [seção 0](#0-verificação-em-produção--07out2026).
+O build não foi rodado (sem `node_modules`). Itens marcados *"confirmar"* dependem de teste em tela.
 
 Numeração: `T*` = criação de tenant, `S*` = continua a série do
 [03-defeitos-e-riscos.md](03-defeitos-e-riscos.md), `C*` = vendas, `A*` = painel admin.
@@ -23,6 +22,8 @@ acompanhar**:
 
 | # | Gravidade | Em uma frase |
 |---|---|---|
+| **P1** | 🔴 Crítico | O lojista **AR E-UTIL**, criado em 08/set, está **sem programa** em produção e o dono nunca conseguiu entrar |
+| **P2** | 🟡 Médio | Conta de teste (`teste@empresa.com`) é **owner do piloto Eminex**; "Loja Teste" não tem nenhum usuário |
 | **T1** | 🔴 Alto | Um tenant novo **nunca consegue ter mais de um nível**: a validação de cobertura recusa qualquer passo intermediário |
 | **T2** | 🔴 Alto | Falha do N8N (404/500) é contada como "enviado por WhatsApp" e o e-mail de reserva **não sai** |
 | **T3** | 🔴 Alto | Falha do e-mail do Supabase (rate limit, SMTP) é contada como "enviado por e-mail" |
@@ -31,8 +32,100 @@ acompanhar**:
 | **S11** | 🔴 Crítico (já conhecido, aberto) | Teto de produto 0 pontua o máximo — e o formulário de produto grava 0 quando o campo fica **vazio** |
 | T4, T6–T11, C1–C2, A1–A3 | 🟡 Médio/Baixo | Detalhes abaixo |
 
-A recomendação é uma **rodada curta de correções (≈ 2–3 dias)** — seção
+A recomendação é resolver **P1 hoje** (um SQL e um reenvio) e depois uma
+**rodada curta de correções (≈ 2–3 dias)** — seção
 [Plano de ação](#plano-de-ação) — antes de criar o próximo lojista pelo portal.
+
+---
+
+## 0. Verificação em produção — 07/out/2026
+
+Consultas só de leitura. Nada foi alterado no banco.
+
+**Schema em dia com o repositório:** as três migrations versionadas estão aplicadas, e os
+corpos de `fn_processar_compra`, `fn_nivel_por_streak` e `fn_rebuild_cliente_fidelidade`
+batem com o que está no repo (com o fallback do S12 e ainda com o bug do teto 0 do S11).
+
+### P1 · 🔴 Crítico · NOVO · Existe um tenant inoperante em produção agora
+
+| Lojista | Criado em | Programa | Dono | Situação |
+|---|---|---|---|---|
+| **AR E-UTIL TECNOLOGIA E SEGURANCA** (`f3a4841b`) | 08/set 15:05 (BRT) | **nenhum** | `victor@areutil.com.br` | **nunca entrou** |
+
+Ele foi criado **uma hora antes** do commit que passou a provisionar programa e nível
+(`e272da8`, 08/set 18:06 BRT). Portanto está exatamente no estado do S13: tela de configuração
+vazia e sem saída, e a primeira venda falha em `fn_programa_ativo`. Além disso, o dono tem
+`recovery_sent_at` um minuto depois da criação e nunca fez login — é o padrão do código
+antigo (link do WhatsApp morto pelo e-mail logo em seguida). Ele provavelmente nunca teve um
+link válido nas mãos.
+
+**Correção (hoje, antes de qualquer outra coisa):** backfill do programa e reenvio do convite.
+
+```sql
+-- Provisiona o tenant criado antes do e272da8. Mesmos valores de src/contracts/acesso.ts.
+with p as (
+  insert into public.programas_fidelidade (lojista_id, nome, dias_expiracao_pontos, dias_para_perder_streak, ativo)
+  values ('f3a4841b-0e5a-452d-ab15-b5219816cc28', 'Programa de Fidelidade', 180, 45, true)
+  returning id
+)
+insert into public.programa_niveis (programa_id, nome, streak_min, streak_max, percentual_conversao, teto_pontos_compra, ordem)
+select id, 'Padrão', 1, null, 1.00, 0, 1 from p;
+```
+
+Depois, usar **Reenviar convite** no portal — de preferência já com T2/T3 corrigidos, para
+saber se o link saiu de fato.
+
+### P2 · 🟡 Médio · NOVO · Conta de teste é dona do lojista piloto
+
+- `teste@empresa.com` tem vínculo **owner** em **Eminex** (o piloto, 125 clientes, 426
+  vendas), com último login em 08/set. É uma conta de teste com acesso total a dados reais.
+- O lojista **Loja Teste** (`9f69ff2a`) não tem **nenhum** usuário vinculado: é um tenant
+  órfão, que ninguém consegue operar.
+
+**Correção:** decidir se a conta de teste deve sair do Eminex (provável) e se Loja Teste deve
+ser desativada. Como `lojistas_usuarios.auth_user_id` é único, a conta de teste só pode estar
+em um lojista — hoje ela está no errado.
+
+### O que o banco confirmou, corrigiu ou dimensionou
+
+| Item | Resultado em produção | Efeito no relatório |
+|---|---|---|
+| **S15** | Confirmado. `authenticated` executa todas as funções do schema; o *Security Advisor* do Supabase aponta as 6 `SECURITY DEFINER` (lint `0029`) | Mantido como Alto |
+| **S5 / T8** | **Corrige o doc 03:** existe job no `pg_cron` — `expirar-lotes-fidelidade-diario`, 02:00 UTC, 215 execuções com sucesso, a última hoje. A expiração está morta **só** porque `validade_dias` é nulo nos 3 programas | Ligar `validade_dias` passa a **ligar a expiração de verdade no dia seguinte**. Não fazer sem decidir a D2 |
+| **Streak** | Eminex configurou `dias_para_perder_streak = 60`; o motor usa 30 fixo. Os clientes do piloto perdem o streak na metade do prazo que a tela mostra | Reforça T8 |
+| **S11** | 2 produtos ativos com teto 0 (os mesmos de setembro) | Sem mudança |
+| **S3** | 428 lotes de 0 pontos em 1.220 | Continua crescendo, ~1 por venda |
+| **S4** | 0 clientes com saldo negativo, 0 linhas em `ajustes_pontos` | Ainda não causou dano |
+| **S7** | 0 resgates | Sem mudança |
+| **C1** | 0 compras sem itens | Ainda não aconteceu |
+| **A1** | Nenhum cliente criado pela tela do lojista desde maio tem CNPJ, então o caminho nunca foi exercido; os 2 clientes com login são de teste, de março | Continua *"confirmar"* |
+| **A2** | 10 usuários no Auth | Rebaixado: só morde depois de 50 |
+
+### P3 · 🟡 Médio · NOVO · Qualidade do cadastro de clientes
+
+- **28 clientes** criados desde maio **sem nenhum documento** (`cnpj` e `documento` nulos).
+  O formulário do lojista só tem o campo "CNPJ", opcional; quem compra como pessoa física fica
+  sem documento. Sem documento não há deduplicação entre lojistas, e o cliente **nunca poderá
+  ter login** (o CHECK `clientes_login_documento_chk` exige documento).
+- **17 clientes sem vínculo** com nenhum lojista, todos criados entre 29/abr e 15/jun — a janela
+  do bug corrigido em "Correção de RLS ao criar cliente" (15/jun): o cliente global era
+  inserido com service role e o vínculo falhava. Invisíveis para todo mundo; podem ser apagados
+  depois de conferir que não têm compras.
+- Nos 111 clientes que têm documento, `cnpj` e `documento` são iguais — vieram da importação
+  de abril.
+
+**Correção:** campo "CPF/CNPJ" (gravando `documento` e `cnpj`), e limpeza dos 17 órfãos. Se
+o CPF for obrigatório ou não é decisão de negócio.
+
+### Outros alertas do Security Advisor
+
+- 11 funções com `search_path` mutável (lint `0011`) — corrigir junto com o S1.1, nas mesmas
+  funções.
+- Proteção contra senha vazada (HaveIBeenPwned) **desligada** no Auth — um clique no painel.
+- `resgates`, `resgate_alocacoes` e `ajustes_pontos` com RLS e sem policy (só service role
+  acessa) — coerente com o fluxo de resgate ainda não existir.
+- 3 admins da plataforma nunca fizeram login (`lucaspeixoto`, `joaoartur.eutil`, `elmer`) —
+  conferir se ainda devem ter acesso.
 
 ---
 
@@ -160,8 +253,9 @@ mostra esses valores. Mas o motor lê `validade_dias` (que fica nulo → ponto n
 `interval '30 days'` fixo para o streak. É o S5, agora replicado em todo tenant novo — e o
 lojista novo é justamente quem vai acreditar no que a tela mostra.
 
-**Solução:** depende da D2 (não é só ligar o campo: sem job de expiração, os pontos "vencidos"
-sumiriam do saldo no rebuild sem movimentação no livro-razão). Enquanto a D2 não fecha,
+**Solução:** depende da D2. Atenção: em produção **o job de expiração existe e roda todo dia**
+(ver seção 0), então preencher `validade_dias` liga a expiração de verdade na madrugada
+seguinte — inclusive para os lotes antigos, se for feito backfill de `expira_em`. Enquanto a D2 não fecha,
 marcar na tela que expiração e janela de streak "ainda não estão ativas", para não vender
 uma regra que não roda.
 
@@ -309,7 +403,7 @@ ordem — validar antes de criar o usuário no Auth.
 Relacionado: a deduplicação do lojista procura por `cnpj`, a do admin e o índice único usam
 `documento`. O mesmo cliente pode nascer duas vezes, uma por cada porta.
 
-### A2 · 🟢 Baixo · Promover admin só enxerga os 50 primeiros usuários do Auth
+### A2 · 🟢 Baixo · Promover admin só enxerga os 50 primeiros usuários do Auth (hoje há 10)
 
 `POST /api/admin/admins` faz `listUsers()` sem paginação (padrão: 50 por página) e procura o
 e-mail na primeira página. Com os clientes com login do piloto, o usuário procurado pode não
@@ -324,6 +418,15 @@ estar nela → "Não existe usuário Auth com esse email".
 Ordenado por "destrava o próximo tenant" e "custo baixo / risco baixo". Estimativas para uma
 pessoa, com teste manual em tela.
 
+### Rodada 0 — hoje (≈ 1 hora)
+
+| Item | O que fazer |
+|---|---|
+| **P1** | Rodar o backfill de programa/nível do AR E-UTIL (SQL na seção 0) e reenviar o convite; confirmar com o Victor que o link chegou e abriu |
+| **P2** | Tirar `teste@empresa.com` do Eminex; decidir o destino da "Loja Teste" |
+| **S15** | Migration de `revoke` (pode ir já — o app não chama essas funções com sessão de usuário) |
+| Auth | Ligar a proteção contra senha vazada no painel |
+
 ### Rodada 1 — antes de criar o próximo lojista (≈ 1 dia)
 
 | Ordem | Item | O que fazer | Arquivos |
@@ -333,8 +436,7 @@ pessoa, com teste manual em tela.
 | 3 | **T5** | Criar `PATCH /api/admin/lojistas/[id]/status` | novo `route.ts` |
 | 4 | **T6** | Mapear `email_exists` → 409 `EMAIL_LOGIN_EM_USO` | `api/admin/lojistas/route.ts` |
 | 5 | **T9** | Remover checkbox "Programa ativo" e recusar `ativo: false` | `programa-form.tsx`, `configuracoes.ts` |
-| 6 | **S15** | Migration de `revoke` das funções que o app não chama | nova migration |
-| 7 | Config | Conferir no Supabase: SMTP próprio, *Redirect URLs*, expiração do link de recovery; conferir no N8N se o fluxo devolve erro HTTP quando o envio falha e se põe o DDI 55 | painel |
+| 6 | Config | Conferir no Supabase: SMTP próprio, *Redirect URLs*, expiração do link de recovery; conferir no N8N se o fluxo devolve erro HTTP quando o envio falha e se põe o DDI 55 | painel |
 
 **Teste de aceite da rodada:** criar um lojista de teste pelo portal (1) com telefone e N8N
 ok, (2) com o webhook do N8N desligado — tem que cair no e-mail e a tela dizer "e-mail",
@@ -358,7 +460,7 @@ expirado estando logado como admin (tem que recusar).
 
 - **S1.1** — guarda de tenant nas 4 RPCs (com teste de lançar/cancelar venda logado como lojista).
 - **C1/C2** — checar o resultado das compensações agora; `fn_lancar_compra` transacional junto com D1/S3.
-- **A1** — confirmar com um cliente do lojista; gravar `documento`, backfill e validar antes do `createUser`.
+- **A1 + P3** — campo "CPF/CNPJ" gravando `documento`; validar antes do `createUser`; limpar os 17 clientes órfãos.
 - **T7** — `fn_provisionar_lojista` transacional.
 - **A2** — paginação em `listUsers`.
 - **T11** — Zod no corpo da criação, 401/403 corretos, validação de `NEXT_PUBLIC_APP_URL` no boot.

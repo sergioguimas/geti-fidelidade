@@ -29,6 +29,8 @@ acompanhar**:
 | **T3** | 🔴 Alto | Falha do e-mail do Supabase (rate limit, SMTP) é contada como "enviado por e-mail" |
 | **T5** | 🔴 Alto | Botão **bloquear/ativar lojista** chama uma rota que não existe |
 | **S15** | 🔴 Alto | Qualquer usuário logado (inclusive cliente final) ainda executa `fn_registrar_movimentacao_pontos` e `fn_expirar_lotes`, que são `SECURITY DEFINER` |
+| **C3** | 🔴 Alto | **Editar uma venda cancelada a reativa** e devolve os pontos ao cliente |
+| **M1** | 🔴 Alto | O painel do piloto mostra **523 pontos gerados** em 30 dias; o motor creditou **50** |
 | **S11** | 🔴 Crítico (já conhecido, aberto) | Teto de produto 0 pontua o máximo — e o formulário de produto grava 0 quando o campo fica **vazio** |
 | T4, T6–T11, C1–C2, A1–A3 | 🟡 Médio/Baixo | Detalhes abaixo |
 
@@ -440,6 +442,120 @@ estar nela → "Não existe usuário Auth com esse email".
 
 ---
 
+## 5. Segunda passada — áreas restantes (07/out/2026)
+
+Cobre o que a primeira passada não leu: painel inicial do lojista, prêmios, resgates,
+produtos e importação, edição de clientes e vendas, e telas de login. Números do banco de
+produção consultados no mesmo dia, só leitura.
+
+### C3 · 🔴 Alto · Editar uma venda cancelada a "ressuscita" como aprovada
+
+Na lista de vendas, o botão **Editar** aparece também nas canceladas (`compras-table.tsx` só
+desliga o "Cancelar"). O formulário envia sempre `status: "aprovada"` (`compra-form.tsx:470`),
+e `updateCompra` não confere o status atual. O resultado:
+
+1. a venda cancelada volta a `aprovada`;
+2. `fn_processar_compra` cria um lote novo e devolve os pontos ao cliente;
+3. a `compensacao_cancelamento` que o cancelamento gravou continua no livro-razão.
+
+O saldo passa a não fechar com o histórico, e o cliente ganha de novo pontos de uma venda
+desfeita. **Em produção:** 4 vendas canceladas, nenhuma reeditada até hoje — é questão de
+alguém clicar.
+
+**Solução (pequena):** esconder "Editar" quando `status === "cancelada"` e, em `updateCompra`,
+recusar a edição de venda cancelada com `ErroDeNegocio` (409).
+
+### C4 · 🟡 Médio · Venda para cliente desativado reativa o cliente
+
+A lista de clientes da tela de venda filtra os ativos, mas a API aceita qualquer `clienteId`.
+`fn_processar_compra` chama `fn_garantir_cliente_fidelidade`, cujo `on conflict` grava
+`ativo = true`: desativar um cliente não impede venda para ele, e a venda o reativa em
+silêncio. **Solução:** em `createCompra`/`updateCompra`, exigir vínculo ativo em
+`clientes_fidelidade` para o lojista da sessão.
+
+### M1 · 🔴 Alto (visível ao piloto) · Painel inicial mostra pontos que não foram creditados
+
+`src/lib/merchant/dashboard.ts` soma `compra_itens.pontos_gerados` — o número calculado pelo
+TypeScript (S6) —, e não o que o motor creditou (`compras.pontos_total`). **Em produção, Eminex,
+últimos 30 dias: o painel mostra 523 pontos gerados; o motor creditou 50.** Mais de 10×.
+
+**Solução (pequena):** somar `compras.pontos_total` das vendas `aprovada`. Não depende da
+decisão D5: é só ler o número que de fato virou saldo.
+
+### M2 · 🟡 Médio · Painel conta vendas canceladas
+
+As consultas de vendas do painel não filtram `status`. Venda cancelada entra no faturamento,
+no ticket médio, nos pontos e no ranking de clientes. **Solução:** `.eq("status", "aprovada")`
+nas três consultas de `compras`.
+
+### M3 · 🟡 Médio · "Clientes novos" conta clientes que só tiveram movimento
+
+O indicador conta linhas de `clientes_fidelidade` com `updated_at` no período — e todo rebuild
+(cada venda, cada expiração) atualiza esse campo. **Em produção, Eminex, últimos 30 dias: o
+painel mostra 49 clientes novos; nenhum cliente fez a primeira compra no período.** A tabela
+nem tem `created_at`. **Solução:** contar clientes cuja **primeira** venda aprovada caiu no
+período (ou criar `created_at` em `clientes_fidelidade`).
+
+### M4 · 🟢 Baixo · Outras imprecisões do painel
+
+"Recorrência" usa 30 dias fixos (o Eminex configurou 60). As consultas não paginam: o
+PostgREST corta em 1.000 linhas, o que trunca os totais em silêncio quando o período for longo.
+
+### R1 · 🟡 Médio · Tela de resgates está sempre vazia — e não conseguiria aprovar nada
+
+`resgates` tem RLS ligada **sem nenhuma policy** (o Security Advisor aponta). Com a sessão do
+lojista, `listResgates` devolve `[]` sempre, e `processarResgate` falharia com "Resgate não
+encontrado". Hoje não há resgates (S7), então não há dano — mas quando o fluxo for ligado, a
+tela não vai funcionar. Isso também significa que o caminho que impediu revogar
+`fn_garantir_cliente_fidelidade` no S15 está morto na prática; ela pode sair junto com o S1.1.
+
+### CL1 · 🟡 Médio · Desmarcar "pode fazer login" não tira o acesso
+
+`updateCliente` só age quando `podeFazerLogin` é `true`. Desmarcar e salvar não faz nada, e a
+tela não avisa. Hoje são 2 clientes com login, ambos de teste. **Solução:** ao desmarcar,
+gravar `pode_fazer_login = false` (o middleware já deixa de reconhecer o cliente).
+
+### PR1 · 🟡 Médio · Importação de produtos com ";" na descrição grava o teto errado
+
+A tela monta o CSV com `join(";")` sem aspas (`buildCsvFromRows`). Uma descrição como
+`CABO 2;5` vira as colunas `CABO 2` | `5` | … — o produto é importado com descrição cortada e
+**teto 5% tirado da descrição**. Quando a sobra não é número, a linha só é recusada.
+**Solução:** mandar as linhas como JSON para a API em vez de CSV (a tela já tem as linhas
+estruturadas), ou escapar com aspas nos dois lados.
+
+### PR2 · 🟢 Baixo · Miudezas de produtos
+
+- As rotas de importação usam `createRouteClient` + vínculo, sem `requireLojistaContext`:
+  lojista **bloqueado** continua conseguindo importar.
+- Excluir produto que já tem venda estoura na FK `RESTRICT` e devolve o texto do Postgres;
+  oferecer "desativar".
+- `console.log("listProdutos debug", …)` imprime a lista inteira de produtos a cada chamada, e
+  `"login merchant debug"` imprime o resultado do login no console do navegador.
+- `xlsx@0.18.5` (SheetJS do npm, abandonado) tem CVEs conhecidos de *prototype pollution* e
+  ReDoS. O risco é baixo — o arquivo é escolhido pelo próprio lojista e lido no navegador —;
+  trocar pela distribuição oficial (`cdn.sheetjs.com`) quando mexer na tela.
+
+### PM1 · 🟢 Baixo · Prêmios
+
+`updatePremio` e `deactivatePremio` não filtram por `lojista_id` (a RLS de `premios` cobre), e
+`nivel_minimo_id` não é conferido contra o programa do lojista: dá para gravar o UUID de um
+nível de outro tenant. Sem efeito hoje (resgate não existe).
+
+### L1 · 🟢 Baixo (área ainda não entregue) · Login do cliente final nunca funciona
+
+`handleCustomerLogin` procura o cliente por documento **antes** de autenticar, com a chave
+anônima. Não há policy de `clientes` para `anon`, então a resposta é sempre "Cliente não
+encontrado". Se houvesse, seria um oráculo de quais documentos são clientes. Entra junto com a
+área do cliente, que ainda é dado fixo.
+
+### L2 · 🟢 Baixo · Lojista bloqueado cai num login genérico
+
+Lojista com `ativo = false` faz login, é mandado para `/lojista`, e o middleware o devolve a
+`/login?unauthorized=1` — com a sessão ainda aberta e sem a mensagem de bloqueio
+(`?blocked=1`), que só o `requireLojistaPageContext` usa.
+
+---
+
 ## Plano de ação
 
 Ordenado por "destrava o próximo tenant" e "custo baixo / risco baixo". Estimativas para uma
@@ -449,21 +565,23 @@ pessoa, com teste manual em tela.
 
 | Item | O que fazer |
 |---|---|
-| **P1** | Rodar o backfill de programa/nível do AR E-UTIL (SQL na seção 0) e reenviar o convite; confirmar com o Victor que o link chegou e abriu |
-| **P2** | Tirar `teste@empresa.com` do Eminex; decidir o destino da "Loja Teste" |
-| **S15** | Migration de `revoke` (pode ir já — o app não chama essas funções com sessão de usuário) |
+| **P1** | ✅ Backfill aplicado e convite reenviado por WhatsApp (link aberto 07/out 08:38); falta o Victor definir a senha |
+| **P2** | Mantido por decisão do Sérgio (conta usada para acompanhar o piloto); falta decidir a "Loja Teste" |
+| **S15** | ✅ Aplicada em 07/out (`20261007114742`) |
 | Auth | Ligar a proteção contra senha vazada no painel |
 
 ### Rodada 1 — antes de criar o próximo lojista (≈ 1 dia)
 
 | Ordem | Item | O que fazer | Arquivos |
 |---|---|---|---|
-| 1 | **T2 + T3** | Extrair `enviarConvite()` com `res.ok`, timeout de 8 s e checagem de `{ error }`; usar nas duas rotas e devolver o canal real | `src/lib/admin/convite.ts` (novo), `api/admin/lojistas/route.ts`, `reenviar-convite/route.ts` |
-| 2 | **T4** (parte imediata) | Mostrar o canal / alerta "convite não enviado" no dialog e no reenvio; esconder a coluna de status fictícia | `novo-lojista-dialog.tsx`, `admin-lojistas-page.tsx` |
+| 1 | ✅ **T2 + T3** | Extrair `enviarConvite()` com `res.ok`, timeout de 8 s e checagem de `{ error }`; usar nas duas rotas e devolver o canal real | `src/lib/admin/convite.ts` (novo), `api/admin/lojistas/route.ts`, `reenviar-convite/route.ts` |
+| 2 | ✅ **T4** (parte imediata; falta esconder a coluna fictícia) | Mostrar o canal / alerta "convite não enviado" no dialog e no reenvio; esconder a coluna de status fictícia | `novo-lojista-dialog.tsx`, `admin-lojistas-page.tsx` |
 | 3 | **T5** | Criar `PATCH /api/admin/lojistas/[id]/status` | novo `route.ts` |
 | 4 | **T6** | Mapear `email_exists` → 409 `EMAIL_LOGIN_EM_USO` | `api/admin/lojistas/route.ts` |
 | 5 | **T9** | Remover checkbox "Programa ativo" e recusar `ativo: false` | `programa-form.tsx`, `configuracoes.ts` |
-| 6 | Config | Conferir no Supabase: SMTP próprio, *Redirect URLs*, expiração do link de recovery; conferir no N8N se o fluxo devolve erro HTTP quando o envio falha e se põe o DDI 55 | painel |
+| 6 | **C3** | Esconder "Editar" em venda cancelada e recusar no `updateCompra` | `compras-table.tsx`, `compras.ts` |
+| 7 | **M1 + M2** | Painel somando `compras.pontos_total` e só vendas `aprovada` | `dashboard.ts` |
+| 8 | Config | Conferir no Supabase: SMTP próprio, *Redirect URLs*, expiração do link de recovery; conferir no N8N se o fluxo devolve erro HTTP quando o envio falha e se põe o DDI 55 | painel |
 
 **Teste de aceite da rodada:** criar um lojista de teste pelo portal (1) com telefone e N8N
 ok, (2) com o webhook do N8N desligado — tem que cair no e-mail e a tela dizer "e-mail",
@@ -491,9 +609,11 @@ expirado estando logado como admin (tem que recusar).
 - **T7** — `fn_provisionar_lojista` transacional.
 - **A2** — paginação em `listUsers`.
 - **T11** — Zod no corpo da criação, 401/403 corretos, validação de `NEXT_PUBLIC_APP_URL` no boot.
+- **C4, M3, CL1, PR1** — vínculo ativo na venda, "clientes novos" pela primeira compra, revogar login ao desmarcar, importação de produtos por JSON.
+- **PR2, PM1, L2, M4** — miudezas da seção 5.
 
 ### Fica para depois (exige decisão de negócio ou é feature)
 
 S3/D1, S4/D8, S5/D2 (ligar expiração de fato), S6/D5, S7/D7, S14 (rota `/auth/confirmar`),
 reset de senha self-service, área do cliente (hoje é dado fixo em
-`api/cliente/dashboard`), S10.
+`api/cliente/dashboard`) com o L1, S10, R1 (policies de `resgates` junto com o fluxo de resgate).

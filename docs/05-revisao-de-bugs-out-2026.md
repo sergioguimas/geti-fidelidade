@@ -48,6 +48,11 @@ batem com o que está no repo (com o fallback do S12 e ainda com o bug do teto 0
 
 ### P1 · 🔴 Crítico · NOVO · Existe um tenant inoperante em produção agora
 
+> **Backfill aplicado em 07/out/2026** (autorizado pelo Sérgio): programa `c747c29c` e nível
+> `Padrão [1, ∞)` `b9b3bf4e`. Verificado: `fn_programa_ativo` devolve o programa e
+> `fn_nivel_por_streak` devolve "Padrão" para streak 1 e 99. **Falta** reenviar o convite e
+> confirmar que o dono conseguiu entrar.
+
 | Lojista | Criado em | Programa | Dono | Situação |
 |---|---|---|---|---|
 | **AR E-UTIL TECNOLOGIA E SEGURANCA** (`f3a4841b`) | 08/set 15:05 (BRT) | **nenhum** | `victor@areutil.com.br` | **nunca entrou** |

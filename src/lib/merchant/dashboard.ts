@@ -125,11 +125,12 @@ export async function getDashboardData(
         pontos_total,
         data_compra,
         compra_itens (
-          subtotal,
-          pontos_gerados
+          subtotal
         )
       `)
       .eq("lojista_id", lojistaId)
+      // Venda cancelada não é venda (M2).
+      .eq("status", "aprovada")
       .gte("data_compra", currentStart)
       .lt("data_compra", currentEnd),
 
@@ -141,11 +142,11 @@ export async function getDashboardData(
         pontos_total,
         data_compra,
         compra_itens (
-          subtotal,
-          pontos_gerados
+          subtotal
         )
       `)
       .eq("lojista_id", lojistaId)
+      .eq("status", "aprovada")
       .gte("data_compra", previousStart)
       .lt("data_compra", previousEnd),
 
@@ -221,6 +222,8 @@ export async function getDashboardData(
         )
       `)
       .eq("lojista_id", lojistaId)
+      // Venda cancelada não é venda (M2).
+      .eq("status", "aprovada")
       .gte("data_compra", currentStart)
       .lt("data_compra", currentEnd),
 
@@ -320,23 +323,16 @@ export async function getDashboardData(
   const clientesNovosPeriodo = clientesNovosPeriodoResp.count ?? 0;
   const clientesNovosPeriodoAnterior = clientesNovosPeriodoAnteriorResp.count ?? 0;
 
+  // compras.pontos_total é o que o motor creditou. compra_itens.pontos_gerados
+  // é a estimativa do TypeScript, que ignora o teto do nível e diverge da
+  // fórmula do banco (S6) — no piloto chegava a 10x o valor real (M1).
   const pontosGeradosPeriodo = compras.reduce(
-    (sum, compra: any) =>
-      sum +
-      (compra.compra_itens ?? []).reduce(
-        (inner: number, item: any) => inner + Number(item.pontos_gerados ?? 0),
-        0
-      ),
+    (sum, compra: any) => sum + Number(compra.pontos_total ?? 0),
     0
   );
 
   const pontosGeradosPeriodoAnterior = comprasPeriodoAnterior.reduce(
-    (sum, compra: any) =>
-      sum +
-      (compra.compra_itens ?? []).reduce(
-        (inner: number, item: any) => inner + Number(item.pontos_gerados ?? 0),
-        0
-      ),
+    (sum, compra: any) => sum + Number(compra.pontos_total ?? 0),
     0
   );
 

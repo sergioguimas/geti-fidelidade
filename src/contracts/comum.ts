@@ -118,6 +118,13 @@ export const CODIGOS_ERRO = {
     mensagem: "Este nível está em uso e não pode ser excluído.",
   },
 
+  COMPRA_NAO_ENCONTRADA: { http: 404, mensagem: "Venda não encontrada." },
+  COMPRA_CANCELADA_IMUTAVEL: {
+    http: 409,
+    mensagem:
+      "Esta venda foi cancelada e não pode ser editada. Lance uma nova venda.",
+  },
+
   LOJISTA_CNPJ_DUPLICADO: {
     http: 409,
     mensagem: "Já existe um lojista com este CNPJ.",

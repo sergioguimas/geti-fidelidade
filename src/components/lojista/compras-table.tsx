@@ -149,7 +149,8 @@ export function ComprasTable({
 
                 <td className="px-4 py-4 align-middle">
                   <RowActions
-                    onEdit={() => onEdit(compra)}
+                    // Venda cancelada é imutável (C3): editar a reativaria.
+                    onEdit={canCancel ? () => onEdit(compra) : undefined}
                     onDelete={() => canCancel && onDelete(compra)}
                     deleteLabel={canCancel ? "Cancelar" : "Cancelada"}
                   />

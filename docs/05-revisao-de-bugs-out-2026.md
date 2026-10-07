@@ -450,6 +450,10 @@ produção consultados no mesmo dia, só leitura.
 
 ### C3 · 🔴 Alto · Editar uma venda cancelada a "ressuscita" como aprovada
 
+> **✅ Corrigido em 07/out/2026:** "Editar" some nas vendas canceladas e `updateCompra` recusa com
+> 409 `COMPRA_CANCELADA_IMUTAVEL` — antes de qualquer escrita, e de novo no próprio `UPDATE`
+> (`status <> cancelada`) para fechar a corrida com um cancelamento simultâneo.
+
 Na lista de vendas, o botão **Editar** aparece também nas canceladas (`compras-table.tsx` só
 desliga o "Cancelar"). O formulário envia sempre `status: "aprovada"` (`compra-form.tsx:470`),
 e `updateCompra` não confere o status atual. O resultado:
@@ -475,6 +479,8 @@ silêncio. **Solução:** em `createCompra`/`updateCompra`, exigir vínculo ativ
 
 ### M1 · 🔴 Alto (visível ao piloto) · Painel inicial mostra pontos que não foram creditados
 
+> **✅ Corrigido em 07/out/2026:** o painel soma `compras.pontos_total`.
+
 `src/lib/merchant/dashboard.ts` soma `compra_itens.pontos_gerados` — o número calculado pelo
 TypeScript (S6) —, e não o que o motor creditou (`compras.pontos_total`). **Em produção, Eminex,
 últimos 30 dias: o painel mostra 523 pontos gerados; o motor creditou 50.** Mais de 10×.
@@ -483,6 +489,8 @@ TypeScript (S6) —, e não o que o motor creditou (`compras.pontos_total`). **E
 decisão D5: é só ler o número que de fato virou saldo.
 
 ### M2 · 🟡 Médio · Painel conta vendas canceladas
+
+> **✅ Corrigido em 07/out/2026:** as três consultas de vendas filtram `status = aprovada`.
 
 As consultas de vendas do painel não filtram `status`. Venda cancelada entra no faturamento,
 no ticket médio, nos pontos e no ranking de clientes. **Solução:** `.eq("status", "aprovada")`
@@ -579,8 +587,8 @@ pessoa, com teste manual em tela.
 | 3 | **T5** | Criar `PATCH /api/admin/lojistas/[id]/status` | novo `route.ts` |
 | 4 | **T6** | Mapear `email_exists` → 409 `EMAIL_LOGIN_EM_USO` | `api/admin/lojistas/route.ts` |
 | 5 | **T9** | Remover checkbox "Programa ativo" e recusar `ativo: false` | `programa-form.tsx`, `configuracoes.ts` |
-| 6 | **C3** | Esconder "Editar" em venda cancelada e recusar no `updateCompra` | `compras-table.tsx`, `compras.ts` |
-| 7 | **M1 + M2** | Painel somando `compras.pontos_total` e só vendas `aprovada` | `dashboard.ts` |
+| 6 | ✅ **C3** | Esconder "Editar" em venda cancelada e recusar no `updateCompra` | `compras-table.tsx`, `compras.ts` |
+| 7 | ✅ **M1 + M2** | Painel somando `compras.pontos_total` e só vendas `aprovada` | `dashboard.ts` |
 | 8 | Config | Conferir no Supabase: SMTP próprio, *Redirect URLs*, expiração do link de recovery; conferir no N8N se o fluxo devolve erro HTTP quando o envio falha e se põe o DDI 55 | painel |
 
 **Teste de aceite da rodada:** criar um lojista de teste pelo portal (1) com telefone e N8N

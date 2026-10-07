@@ -6,6 +6,7 @@ import type {
   CompraCancelamentoPreview,
   CompraListFilters,
 } from "../types";
+import { ErroDeNegocio } from "@/lib/erros";
 
 function round2(value: number) {
   return Math.round(value * 100) / 100;
@@ -506,6 +507,28 @@ export async function updateCompra(
     throw new Error("A compra precisa ter ao menos um item.");
   }
 
+  // Venda cancelada é imutável: o formulário sempre envia status "aprovada",
+  // e reprocessá-la devolveria os pontos ao cliente enquanto a
+  // compensacao_cancelamento continua no livro-razão (C3).
+  const { data: atual, error: atualError } = await supabase
+    .from("compras")
+    .select("id, status")
+    .eq("id", input.id)
+    .eq("lojista_id", lojistaId)
+    .maybeSingle();
+
+  if (atualError) {
+    throw new Error(atualError.message);
+  }
+
+  if (!atual) {
+    throw new ErroDeNegocio("COMPRA_NAO_ENCONTRADA");
+  }
+
+  if (atual.status === "cancelada") {
+    throw new ErroDeNegocio("COMPRA_CANCELADA_IMUTAVEL");
+  }
+
   const produtosMap = await loadProdutos(
     supabase,
     lojistaId,
@@ -544,13 +567,18 @@ export async function updateCompra(
     })
     .eq("id", input.id)
     .eq("lojista_id", lojistaId)
+    .neq("status", "cancelada") // fecha a corrida com um cancelamento simultâneo
     .select(
       "id, lojista_id, cliente_id, subtotal_bruto, desconto_total, valor_total, pontos_total, status, origem, data_compra, created_at, updated_at"
     )
-    .single();
+    .maybeSingle();
 
-  if (compraError || !compra) {
-    throw new Error(compraError?.message ?? "Erro ao atualizar compra.");
+  if (compraError) {
+    throw new Error(compraError.message);
+  }
+
+  if (!compra) {
+    throw new ErroDeNegocio("COMPRA_CANCELADA_IMUTAVEL");
   }
 
   const { error: deleteItensError } = await supabase

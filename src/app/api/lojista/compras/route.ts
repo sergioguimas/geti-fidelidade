@@ -8,6 +8,7 @@ import {
   cancelCompra,
   updateCompra,
 } from "@/lib/merchant/compras";
+import { respostaDeErro } from "@/lib/erros";
 
 export async function GET(request: NextRequest) {
   try {
@@ -122,13 +123,7 @@ export async function PATCH(request: NextRequest) {
 
     return NextResponse.json({ data: compra });
   } catch (error) {
-    return NextResponse.json(
-      {
-        error:
-          error instanceof Error ? error.message : "Erro ao atualizar compra.",
-      },
-      { status: 500 }
-    );
+    return respostaDeErro(error, "Erro ao atualizar compra.");
   }
 }
 
